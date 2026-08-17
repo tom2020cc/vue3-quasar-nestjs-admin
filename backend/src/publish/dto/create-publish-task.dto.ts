@@ -1,0 +1,56 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { IsArray, IsIn, IsNumber, IsOptional, IsString } from 'class-validator'
+
+export class CreatePublishTaskDto {
+  @ApiProperty({ description: '视频标题', example: '我的第一个视频' })
+  @IsString()
+  title: string
+
+  @ApiPropertyOptional({ description: '视频描述/文案' })
+  @IsOptional()
+  @IsString()
+  description?: string
+
+  @ApiProperty({ description: '已上传到后端的视频文件名', example: '1718xxxx.mp4' })
+  @IsString()
+  videoFilename: string
+
+  @ApiProperty({
+    description: '尺寸方向：landscape 宽屏 / portrait 窄屏',
+    enum: ['landscape', 'portrait'],
+    example: 'landscape',
+  })
+  @IsIn(['landscape', 'portrait'])
+  orientation: 'landscape' | 'portrait'
+
+  @ApiProperty({ description: '视频宽度', example: 1920 })
+  @IsNumber()
+  width: number
+
+  @ApiProperty({ description: '视频高度', example: 1080 })
+  @IsNumber()
+  height: number
+
+  @ApiPropertyOptional({ description: '视频内容哈希（SHA-256），由上传接口返回，用于重复检测' })
+  @IsOptional()
+  @IsString()
+  videoHash?: string
+
+  @ApiPropertyOptional({ description: '视频时长（秒）', example: 12.5 })
+  @IsOptional()
+  @IsNumber()
+  duration?: number
+
+  @ApiPropertyOptional({ description: '视频封面（base64 data URL）' })
+  @IsOptional()
+  @IsString()
+  cover?: string
+
+  @ApiProperty({
+    description: '目标平台编码数组',
+    example: ['douyin_cn', 'youtube'],
+    isArray: true,
+  })
+  @IsArray()
+  platforms: string[]
+}

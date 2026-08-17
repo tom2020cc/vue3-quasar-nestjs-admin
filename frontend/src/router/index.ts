@@ -15,6 +15,12 @@ const router = createRouter({
         { path: 'users', name: 'users', component: () => import('@/views/UsersView.vue') },
         { path: 'menus', name: 'menus', component: () => import('@/views/MenusView.vue') },
         { path: 'upload', name: 'upload', component: () => import('@/views/UploadView.vue') },
+        { path: 'publish', name: 'publish', component: () => import('@/views/VideoPublishView.vue') },
+        { path: 'platform-config', name: 'platform-config', component: () => import('@/views/PlatformConfigView.vue') },
+        { path: 'platform-tutorial', name: 'platform-tutorial', component: () => import('@/views/PlatformTutorialView.vue') },
+        { path: 'video-library', name: 'video-library', component: () => import('@/views/VideoLibraryView.vue') },
+        { path: 'youtube-videos', name: 'youtube-videos', component: () => import('@/views/YoutubeVideosView.vue') },
+        { path: 'tiktok-videos', name: 'tiktok-videos', component: () => import('@/views/TiktokVideosView.vue') },
       ],
     },
     {

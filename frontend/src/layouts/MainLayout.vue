@@ -65,12 +65,29 @@
             <q-item-section avatar><q-icon name="cloud_upload" /></q-item-section>
             <q-item-section>图片上传</q-item-section>
           </q-item>
-
-          <q-separator class="q-my-sm" />
-          <q-item clickable v-ripple :href="apiDocsUrl" target="_blank" rel="noopener">
-            <q-item-section avatar><q-icon name="description" /></q-item-section>
-            <q-item-section>接口文档</q-item-section>
-            <q-item-section side><q-icon name="open_in_new" size="16px" /></q-item-section>
+          <q-item clickable v-ripple :to="'/publish'">
+            <q-item-section avatar><q-icon name="movie" /></q-item-section>
+            <q-item-section>视频发布</q-item-section>
+          </q-item>
+          <q-item clickable v-ripple :to="'/video-library'">
+            <q-item-section avatar><q-icon name="video_library" /></q-item-section>
+            <q-item-section>视频库</q-item-section>
+          </q-item>
+          <q-item clickable v-ripple :to="'/youtube-videos'">
+            <q-item-section avatar><q-icon name="smart_display" /></q-item-section>
+            <q-item-section>油管视频</q-item-section>
+          </q-item>
+          <q-item clickable v-ripple :to="'/tiktok-videos'">
+            <q-item-section avatar><q-icon name="music_note" /></q-item-section>
+            <q-item-section>TikTok 视频</q-item-section>
+          </q-item>
+          <q-item clickable v-ripple :to="'/platform-config'">
+            <q-item-section avatar><q-icon name="settings" /></q-item-section>
+            <q-item-section>平台配置</q-item-section>
+          </q-item>
+          <q-item clickable v-ripple :to="'/platform-tutorial'">
+            <q-item-section avatar><q-icon name="school" /></q-item-section>
+            <q-item-section>接入教程</q-item-section>
           </q-item>
         </q-list>
       </q-scroll-area>
@@ -88,15 +105,11 @@ import { Dialog, Notify } from 'quasar'
 import { useRouter } from 'vue-router'
 import { useMyTokenStore } from '@/stores/myToken'
 import { getInfo } from '@/api/users'
-import { API_BASE_URL } from '@/utils/request'
 
 const leftDrawerOpen = ref(true)
 const router = useRouter()
 const tokenStore = useMyTokenStore()
 const userEmail = ref('')
-
-// 后端 Swagger 接口文档地址（跟随 .env 中的 VITE_API_BASE_URL）
-const apiDocsUrl = `${API_BASE_URL}/api-docs`
 
 const avatarLetter = computed(() =>
   userEmail.value ? userEmail.value[0].toUpperCase() : 'U'

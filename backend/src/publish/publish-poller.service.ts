@@ -1,0 +1,138 @@
+import {
+  Injectable,
+  OnApplicationBootstrap,
+  OnApplicationShutdown,
+} from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
+import { PublishRecord } from './entities/publish-record.entity'
+import { PublishService } from './publish.service'
+import { PlatformConfigService } from '../platform/platform-config.service'
+import { PlatformAdapterFactory } from '../platform/adapters/platform-adapter.factory'
+
+// 发布状态轮询服务
+// 发布接口是异步的：视频提交到平台后需经历转码/审核，最终状态需周期性查询。
+// 本服务用原生 setInterval 周期扫描「processing」状态的记录，调用各平台
+// queryStatus 获取最终状态并落库，再汇总对应任务的整体状态。
+@Injectable()
+export class PublishPollerService implements OnApplicationBootstrap, OnApplicationShutdown {
+  private timer: NodeJS.Timeout | null = null
+  private running = false // 防止上一轮未结束又触发下一轮
+
+  constructor(
+    @InjectRepository(PublishRecord)
+    private readonly recordRepo: Repository<PublishRecord>,
+    private readonly configService: PlatformConfigService,
+    private readonly factory: PlatformAdapterFactory,
+    private readonly publishService: PublishService,
+    private readonly env: ConfigService,
+  ) {}
+
+  onApplicationBootstrap() {
+    this.timer = setInterval(
+      () => this.poll().catch((e) => console.error('发布状态轮询异常：', e)),
+      this.intervalMs,
+    )
+    console.log(
+      `发布状态轮询已启动（每 ${this.intervalMs}ms，最多 ${this.maxAttempts} 次）`,
+    )
+  }
+
+  onApplicationShutdown() {
+    if (this.timer) clearInterval(this.timer)
+  }
+
+  private get intervalMs(): number {
+    const v = Number(this.env.get('POLL_INTERVAL_MS'))
+    return Number.isFinite(v) && v > 0 ? v : 15000
+  }
+
+  private get maxAttempts(): number {
+    const v = Number(this.env.get('POLL_MAX_ATTEMPTS'))
+    return Number.isFinite(v) && v > 0 ? v : 20
+  }
+
+  // 一轮轮询：找出所有处理中的记录，逐条查询并落库，最后汇总任务状态
+  async poll() {
+    if (this.running) return
+    this.running = true
+    try {
+      const records = await this.recordRepo.find({ where: { status: 'processing' } })
+      if (records.length === 0) return
+
+      const taskIds = new Set<number>()
+      for (const record of records) {
+        taskIds.add(record.taskId)
+        await this.pollOne(record)
+      }
+      // 每条记录状态变化后，重新汇总其所属任务状态
+      for (const taskId of taskIds) {
+        await this.publishService.updateTaskStatus(taskId)
+      }
+    } finally {
+      this.running = false
+    }
+  }
+
+  private async pollOne(record: PublishRecord) {
+    record.pollCount = (record.pollCount || 0) + 1
+
+    // 模拟发布：本地模拟「处理中 → 完成」，第 2 次轮询即视为成功
+    if (record.mock) {
+      if (record.pollCount >= 2) {
+        record.status = 'success'
+        record.publishedAt = new Date()
+        record.message = '【模拟发布】已完成'
+      } else {
+        record.message = `【模拟发布】平台处理中…（${record.pollCount}/${this.maxAttempts}）`
+      }
+      await this.recordRepo.save(record)
+      return
+    }
+
+    // 超时兜底：超过最大轮询次数仍未完成，标记失败
+    if (record.pollCount > this.maxAttempts) {
+      record.status = 'failed'
+      record.message = `轮询超时（已轮询 ${this.maxAttempts} 次，仍未完成）`
+      await this.recordRepo.save(record)
+      return
+    }
+
+    const adapter = this.factory.get(record.platform)
+    if (!adapter || !adapter.queryStatus) {
+      record.status = 'failed'
+      record.message = '该平台不支持发布状态查询'
+      await this.recordRepo.save(record)
+      return
+    }
+
+    const config = await this.configService.findByCode(record.platform)
+    if (!config) {
+      record.status = 'failed'
+      record.message = '平台配置不存在'
+      await this.recordRepo.save(record)
+      return
+    }
+
+    try {
+      const result = await adapter.queryStatus({
+        externalId: record.externalId || '',
+        config,
+        pollCount: record.pollCount,
+      })
+      if (result.status === 'success') {
+        record.status = 'success'
+        record.publishedAt = new Date()
+        if (result.externalUrl) record.externalUrl = result.externalUrl
+      } else if (result.status === 'failed') {
+        record.status = 'failed'
+      }
+      if (result.message) record.message = result.message
+    } catch (e: any) {
+      // 单次查询失败不改变状态，保留原 message，下一轮继续
+      record.message = `状态查询异常：${e.message}`
+    }
+    await this.recordRepo.save(record)
+  }
+}

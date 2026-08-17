@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国产抖音接入教程 · 获取令牌全流程</title>
+<style>
+  :root { --primary:#fe2c55; --dark:#1f2937; --text:#374151; --bg:#f8fafc; --border:#e5e7eb; --blue:#2563eb; --green:#16a34a; --amber:#d97706; --code-bg:#0f172a; --code-fg:#e2e8f0; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; color:var(--text); background:var(--bg); line-height:1.75; }
+  header { background:linear-gradient(135deg,#fe2c55 0%,#d91a4a 100%); color:#fff; padding:48px 24px; text-align:center; }
+  header h1 { margin:0 0 8px; font-size:30px; }
+  header p { margin:0; opacity:.92; font-size:15px; }
+  .container { max-width:860px; margin:0 auto; padding:32px 20px 80px; }
+  h2 { color:var(--dark); font-size:24px; margin:48px 0 16px; padding-left:14px; border-left:5px solid var(--primary); }
+  h3 { color:var(--dark); font-size:19px; margin:32px 0 12px; }
+  h4 { color:#111827; font-size:16px; margin:20px 0 8px; }
+  p { margin:10px 0; }
+  ol,ul { margin:10px 0; padding-left:26px; }
+  li { margin:6px 0; }
+  code { background:#eef2f7; border:1px solid var(--border); border-radius:5px; padding:1px 7px; font-family:Consolas,"Courier New",monospace; font-size:.9em; color:#d91a4a; }
+  pre { background:var(--code-bg); color:var(--code-fg); padding:14px 16px; border-radius:8px; overflow-x:auto; font-family:Consolas,"Courier New",monospace; font-size:14px; line-height:1.6; }
+  pre code { background:none; border:none; color:inherit; padding:0; }
+  .card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:18px 22px; margin:16px 0; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .tip,.warn,.danger { border-radius:8px; padding:14px 18px; margin:16px 0; border-left:5px solid; }
+  .tip { background:#eff6ff; border-color:var(--blue); }
+  .warn { background:#fffbeb; border-color:var(--amber); }
+  .danger { background:#fef2f2; border-color:var(--primary); }
+  .tip::before { content:"💡 提示："; font-weight:700; color:var(--blue); }
+  .warn::before { content:"⚠️ 易错："; font-weight:700; color:var(--amber); }
+  .danger::before { content:"❗ 关键："; font-weight:700; color:var(--primary); }
+  table { border-collapse:collapse; width:100%; margin:16px 0; background:#fff; }
+  th,td { border:1px solid var(--border); padding:9px 12px; text-align:left; font-size:14px; }
+  th { background:#f1f5f9; color:var(--dark); font-weight:600; }
+  .toc { background:#fff; border:1px solid var(--border); border-radius:10px; padding:18px 24px; }
+  .toc a { color:var(--blue); text-decoration:none; }
+  .toc a:hover { text-decoration:underline; }
+  footer { text-align:center; color:#9ca3af; font-size:13px; padding:24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>国产抖音接入教程</h1>
+  <p>从零申请应用 → 拿 Client Key / Secret → 授权拿到令牌（宽屏、窄屏均支持）</p>
+</header>
+
+<div class="container">
+
+  <div class="toc">
+    <h3 style="margin-top:0">📑 目录</h3>
+    <ol>
+      <li><a href="#intro">平台介绍</a></li>
+      <li><a href="#account">第 1 步：注册开发者账号 &amp; 创建应用</a></li>
+      <li><a href="#scope">第 2 步：申请「代替用户发布内容」能力</a></li>
+      <li><a href="#callback">第 3 步：配置回调地址</a></li>
+      <li><a href="#fill">第 4 步：填进系统「平台配置」页</a></li>
+      <li><a href="#auth">第 5 步：点「授权」完成授权</a></li>
+      <li><a href="#success">成功标志</a></li>
+      <li><a href="#errors">易错点汇总</a></li>
+      <li><a href="#terms">名词对照表</a></li>
+    </ol>
+  </div>
+
+  <h2 id="intro">一、平台介绍</h2>
+  <p>国产抖音用的是「抖音开放平台」的<strong>「代替用户发布内容到抖音」</strong>能力，<strong>宽屏、窄屏都支持</strong>，是四个平台里唯一一个两个尺寸都能发的。</p>
+  <div class="tip">抖音是国内平台，<strong>不需要翻墙</strong>，整个流程都可以直接访问。</div>
+
+  <h2 id="account">二、第 1 步：注册开发者账号 &amp; 创建应用</h2>
+  <ol>
+    <li>打开 <a href="https://developer.open-douyin.com" target="_blank">抖音开放平台</a>，注册 / 登录（个人或企业均可，部分能力要求企业资质）。</li>
+    <li>进入「控制台 → 移动应用 / 网站应用」，点「<strong>创建应用</strong>」，填写应用名称、图标、简介。</li>
+    <li>应用创建后，在「应用详情 → 凭据」页能看到两个值：
+      <ul>
+        <li><strong>Client Key</strong> → 对应系统的 <code>appId</code></li>
+        <li><strong>Client Secret</strong> → 对应系统的 <code>appSecret</code></li>
+      </ul>
+    </li>
+  </ol>
+
+  <h2 id="scope">三、第 2 步：申请「代替用户发布内容」能力</h2>
+  <ol>
+    <li>进入应用的「能力管理」，找到 <strong>「代替用户发布内容到抖音」</strong>，申请开通。</li>
+    <li>相关权限：<code>video.create</code>（发布视频）、<code>video.data</code>（查询视频数据，用于轮询最终状态）。</li>
+    <li>部分能力需要提交审核，<strong>通过后才能</strong>在授权时拿到对应权限。</li>
+  </ol>
+
+  <h2 id="callback">四、第 3 步：配置回调地址</h2>
+  <p>在应用的「安全设置 / 回调配置」中，填写<strong>授权回调域</strong>：</p>
+  <pre><code>http://localhost:5001/platform/douyin_cn/oauth/callback</code></pre>
+  <div class="tip">抖音的「授权回调域」通常只校验<strong>域名</strong>（<code>localhost:5001</code>），不校验完整路径，登记域名即可。</div>
+
+  <h2 id="fill">五、第 4 步：填进系统「平台配置」页</h2>
+  <ol>
+    <li>打开系统「平台配置」页：<code>http://localhost:5173/#/platform-config</code>（登录用 <code>admin@qq.com / admin123</code>）。</li>
+    <li>找到「<strong>国产抖音</strong>」这一行，点「<strong>配置</strong>」。</li>
+    <li>填两项，其它留空：
+      <ul>
+        <li><strong>应用ID（client_key / client_id）</strong> ← <strong>Client Key</strong></li>
+        <li><strong>应用密钥 client_secret</strong> ← <strong>Client Secret</strong></li>
+      </ul>
+    </li>
+    <li>点「<strong>保存</strong>」。</li>
+  </ol>
+
+  <h2 id="auth">六、第 5 步：点「授权」完成授权</h2>
+  <ol>
+    <li>抖音那一行点「<strong>授权</strong>」，跳转到抖音登录 / 授权页。</li>
+    <li>用你的抖音账号扫码 / 登录，同意授权。</li>
+    <li>授权成功自动跳回，<code>accessToken</code> 和 <code>openId</code> 已自动回填。</li>
+  </ol>
+
+  <h2 id="success">七、成功标志</h2>
+  <div class="card">
+    <ul style="margin:0">
+      <li>页面弹出：<strong>「国产抖音 授权成功，令牌已保存」</strong></li>
+      <li>表格里「国产抖音」那一行变成 <strong>「已配置凭证」</strong></li>
+      <li>数据库里 <code>accessToken</code> 和 <code>openId</code> 都已写入</li>
+    </ul>
+  </div>
+
+  <h2 id="errors">八、易错点汇总</h2>
+  <table>
+    <tr><th style="width:26%">坑</th><th>现象 / 原因</th><th style="width:42%">解决办法</th></tr>
+    <tr><td><strong>走了模拟发布</strong></td><td>配置显示"未配置"，发布是假的</td><td>抖音必须 <code>accessToken</code> + <code>openId</code> 两个都有，缺一个就模拟</td></tr>
+    <tr><td><strong>授权拿不到权限</strong></td><td>授权页没有发布权限</td><td>先去「能力管理」申请并等审核通过</td></tr>
+    <tr><td><strong>回调域不匹配</strong></td><td>授权后回调失败</td><td>回调域填 <code>localhost:5001</code>，与系统一致</td></tr>
+    <tr><td><strong>token 过期</strong></td><td>发布时提示过期</td><td>access_token 约 15 天，用「刷新令牌」按钮或重新授权</td></tr>
+  </table>
+
+  <h2 id="terms">九、名词对照表</h2>
+  <table>
+    <tr><th>系统字段</th><th>抖音的叫法</th><th>说明</th></tr>
+    <tr><td><code>appId</code></td><td><code>Client Key</code> / client_key</td><td>应用标识</td></tr>
+    <tr><td><code>appSecret</code></td><td><code>Client Secret</code> / client_secret</td><td>应用密钥</td></tr>
+    <tr><td><code>accessToken</code></td><td><code>access_token</code></td><td>用户访问令牌（必填）</td></tr>
+    <tr><td><code>openId</code></td><td><code>open_id</code></td><td>授权用户标识（必填）</td></tr>
+  </table>
+
+</div>
+
+<footer>国产抖音接入教程 · 更新于 2026-08-17</footer>
+
+</body>
+</html>

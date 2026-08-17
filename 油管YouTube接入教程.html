@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>油管 YouTube 接入教程 · 获取令牌全流程</title>
+<style>
+  :root {
+    --primary: #e62117;
+    --dark: #1f2937;
+    --text: #374151;
+    --bg: #f8fafc;
+    --border: #e5e7eb;
+    --blue: #2563eb;
+    --green: #16a34a;
+    --amber: #d97706;
+    --code-bg: #0f172a;
+    --code-fg: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.75;
+  }
+  header {
+    background: linear-gradient(135deg, #e62117 0%, #b3120b 100%);
+    color: #fff;
+    padding: 48px 24px;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 8px; font-size: 30px; }
+  header p { margin: 0; opacity: .92; font-size: 15px; }
+  .container { max-width: 860px; margin: 0 auto; padding: 32px 20px 80px; }
+  h2 {
+    color: var(--dark);
+    font-size: 24px;
+    margin: 48px 0 16px;
+    padding-left: 14px;
+    border-left: 5px solid var(--primary);
+  }
+  h3 { color: var(--dark); font-size: 19px; margin: 32px 0 12px; }
+  h4 { color: #111827; font-size: 16px; margin: 20px 0 8px; }
+  p { margin: 10px 0; }
+  ol, ul { margin: 10px 0; padding-left: 26px; }
+  li { margin: 6px 0; }
+  code {
+    background: #eef2f7;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 7px;
+    font-family: "SFMono-Regular", Consolas, "Courier New", monospace;
+    font-size: .9em;
+    color: #b3120b;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 16px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .tip, .warn, .danger {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-left: 5px solid;
+  }
+  .tip   { background: #eff6ff; border-color: var(--blue); }
+  .warn  { background: #fffbeb; border-color: var(--amber); }
+  .danger{ background: #fef2f2; border-color: var(--primary); }
+  .tip::before   { content: "💡 提示："; font-weight: 700; color: var(--blue); }
+  .warn::before  { content: "⚠️ 易错："; font-weight: 700; color: var(--amber); }
+  .danger::before{ content: "❗ 关键："; font-weight: 700; color: var(--primary); }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; background: #fff; }
+  th, td { border: 1px solid var(--border); padding: 9px 12px; text-align: left; font-size: 14px; }
+  th { background: #f1f5f9; color: var(--dark); font-weight: 600; }
+  .toc { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 18px 24px; }
+  .toc a { color: var(--blue); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc ol { columns: 1; }
+  .step-num {
+    display: inline-block; background: var(--primary); color: #fff;
+    width: 26px; height: 26px; line-height: 26px; text-align: center;
+    border-radius: 50%; margin-right: 8px; font-weight: 700; font-size: 14px;
+  }
+  .kv { display: inline-block; background: #fff; border: 1px dashed var(--primary); color: var(--primary); border-radius: 6px; padding: 2px 10px; font-family: Consolas, monospace; font-weight: 600; }
+  footer { text-align: center; color: #9ca3af; font-size: 13px; padding: 24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>油管 YouTube 接入教程</h1>
+  <p>从零申请应用 → 拿 Client ID / Secret → 授权拿到令牌（含新版界面 &amp; 全部易错点）</p>
+</header>
+
+<div class="container">
+
+  <div class="toc">
+    <h3 style="margin-top:0">📑 目录</h3>
+    <ol>
+      <li><a href="#why">为什么油管最难弄</a></li>
+      <li><a href="#prepare">第 0 步：翻墙准备（最重要）</a></li>
+      <li><a href="#project">第 1 步：创建 Google Cloud 项目</a></li>
+      <li><a href="#api">第 2 步：开通 YouTube Data API</a></li>
+      <li><a href="#consent">第 3 步：配置 OAuth 同意屏幕（新版界面）</a></li>
+      <li><a href="#client">第 4 步：创建 OAuth 客户端，拿 Client ID / Secret</a></li>
+      <li><a href="#fill">第 5 步：填进系统「平台配置」页</a></li>
+      <li><a href="#auth">第 6 步：点「授权」完成授权</a></li>
+      <li><a href="#success">成功标志</a></li>
+      <li><a href="#errors">易错点汇总（踩坑大全）</a></li>
+      <li><a href="#terms">名词对照表</a></li>
+    </ol>
+  </div>
+
+  <h2 id="why">一、为什么油管最难弄</h2>
+  <p>抖音 / 快手 / TikTok 都是在一个「开放平台网站」里直接建应用；但 <strong>Google 把这件事拆成了三层</strong>，而且还要单独配一个「同意屏幕」，所以步骤最多：</p>
+  <div class="card">
+    <p style="margin:0"><strong>「项目」</strong> → <strong>「开通 API」</strong> → <strong>「OAuth 客户端」</strong> → <strong>「同意屏幕」</strong></p>
+    <p style="margin:6px 0 0;color:#6b7280;font-size:14px">这里的「项目」就是 Google 里"一个应用"的容器，只是名字叫"项目"，别被绕晕。</p>
+  </div>
+
+  <h2 id="prepare">二、第 0 步：翻墙准备（最重要）</h2>
+  <div class="danger">
+    油管授权和发布，都需要<strong>后端服务器</strong>去调 Google 的接口（换 token、上传视频、查状态）。所以光浏览器能上 Google 不够，必须让<strong>后端程序也能上 Google</strong>。
+  </div>
+  <p>很多同学卡在最后一步报 <code>授权失败：fetch failed</code>，原因就是：浏览器走了代理（翻墙软件），但后端程序没走，直接访问 Google 超时。</p>
+  <h4>✅ 正确做法</h4>
+  <ol>
+    <li>打开你的翻墙软件（Clash / Clash Verge / V2RayN / Shadowrocket 等）。</li>
+    <li>把模式从「系统代理 / PAC」改成 <strong>「全局模式」（Global）</strong> 或 <strong>「TUN 模式」（虚拟网卡 / 增强模式）</strong>。</li>
+    <li>让 <strong>所有程序</strong>（包括 Node 后端）都走代理。</li>
+  </ol>
+  <div class="warn">
+    <strong>必须用「全局 / TUN」模式</strong>，不能用「系统代理 / PAC」模式——后两种只有浏览器等"遵守系统代理的软件"会走代理，Node 后端默认不遵守，照样连不上 Google。
+  </div>
+
+  <h2 id="project">三、第 1 步：创建 Google Cloud 项目</h2>
+  <ol>
+    <li>打开 <a href="https://console.cloud.google.com/" target="_blank">Google Cloud 控制台</a>，<strong>用你自己的 Google 账号登录</strong>（就是你想发视频上去的那个账号）。</li>
+    <li>看页面<strong>最顶部中间</strong>，点「选择项目」→ 弹窗右上角「<strong>新建项目</strong>」。</li>
+    <li>项目名随便起，比如 <code>video-upload</code>，点「创建」。</li>
+    <li>等顶部那行显示你刚起的项目名，再进行下一步。</li>
+  </ol>
+
+  <h2 id="api">四、第 2 步：开通 YouTube Data API</h2>
+  <ol>
+    <li>左侧菜单 →「<strong>API 和服务</strong>」→「已启用的 API 和服务」→ 点「<strong>＋ 启用 API 和服务</strong>」。</li>
+    <li>搜索框输入 <code>YouTube Data API v3</code>，点进去，点「<strong>启用</strong>」。</li>
+  </ol>
+
+  <h2 id="consent">五、第 3 步：配置 OAuth 同意屏幕（新版界面）</h2>
+  <div class="warn">
+    Google 已经<strong>改版</strong>了！网上很多老教程写的「选 External → 点 Create」是<strong>老版本</strong>的按钮，新版里找不到。新版把这一步拆成了左侧菜单里的几个页面。
+  </div>
+  <p>新版在 <strong>左侧菜单</strong> 有这些项（在「API 和服务」里，也可能叫「Google Auth Platform」）：</p>
+  <pre><code>Overview      （总览）
+Branding      （品牌信息：应用名、支持邮箱）
+Audience      （受众：老版的 External / Internal 在这里）
+Clients       （客户端：就是"凭据 / Client ID"）
+Data access   （数据访问：权限 scope）
+Security</code></pre>
+
+  <h4>① 点左侧「Branding」</h4>
+  <ol>
+    <li><strong>App name</strong>（应用名）：随便，比如 <code>video-upload</code></li>
+    <li><strong>User support email</strong>（支持邮箱）：填你自己的邮箱</li>
+    <li>点 <strong>Save</strong></li>
+  </ol>
+
+  <h4>② 点左侧「Audience」（老版的 External 在这里）</h4>
+  <ol>
+    <li>把受众类型选成 <strong>External</strong>。</li>
+    <li>找到 <strong>Test users</strong>，点「<strong>Add users</strong>」，填<strong>你自己的邮箱</strong>。</li>
+    <li>点 <strong>Save</strong>。</li>
+  </ol>
+  <div class="tip">
+    为什么要加"测试用户"：没正式上架的应用，Google 只允许"测试用户名单"里的人授权，<strong>不加自己就授权不了</strong>。
+  </div>
+
+  <h2 id="client">六、第 4 步：创建 OAuth 客户端，拿 Client ID / Secret</h2>
+  <ol>
+    <li>点左侧「<strong>Clients</strong>」，点「<strong>Create OAuth client</strong>」。</li>
+    <li>Application type 选 <strong>Web application</strong>。</li>
+    <li>名称随便。</li>
+    <li>重点填下面的两个框（<strong>别填错框</strong>）：</li>
+  </ol>
+
+  <div class="warn">
+    <strong>最容易填错的一步！</strong> 有两个长得很像的框，很多人把回调地址贴进了错的框里：
+  </div>
+  <table>
+    <tr><th>字段</th><th>填什么</th></tr>
+    <tr>
+      <td><code>Authorized JavaScript origins</code><br>（授权 JavaScript 来源）</td>
+      <td><strong style="color:#dc2626">留空，什么都不填</strong>（它只接受域名、不能带路径）</td>
+    </tr>
+    <tr>
+      <td><code>Authorized redirect URIs</code><br>（授权重定向 URI）</td>
+      <td>填下面这一行（点「+ Add URI」再贴）：</td>
+    </tr>
+  </table>
+
+  <pre><code>http://localhost:5001/platform/youtube/oauth/callback</code></pre>
+
+  <p>填好后点 <strong>Create</strong>，弹窗会显示两个值，<strong>复制下来别关</strong>：</p>
+  <ul>
+    <li><strong>Client ID</strong>（客户端 ID）→ 对应系统的 <code>appId</code></li>
+    <li><strong>Client Secret</strong>（客户端密钥）→ 对应系统的 <code>appSecret</code></li>
+  </ul>
+
+  <h2 id="fill">七、第 5 步：填进系统「平台配置」页</h2>
+  <ol>
+    <li>打开我们系统的「平台配置」页：<code>http://localhost:5173/#/platform-config</code>（若要求登录，用 <code>admin@qq.com / admin123</code>）。</li>
+    <li>找到「<strong>油管 YouTube</strong>」这一行，点右边的「<strong>配置</strong>」按钮。</li>
+    <li>只填这两项，其它全部留空：
+      <ul>
+        <li><strong>应用ID（client_key / client_id）</strong> ← 粘贴 <strong>Client ID</strong></li>
+        <li><strong>应用密钥 client_secret</strong> ← 粘贴 <strong>Client Secret</strong></li>
+      </ul>
+    </li>
+    <li>点「<strong>保存</strong>」。</li>
+  </ol>
+
+  <h2 id="auth">八、第 6 步：点「授权」完成授权</h2>
+  <ol>
+    <li>回到表格，油管 YouTube 那一行点「<strong>授权</strong>」按钮，浏览器跳转到 Google。</li>
+    <li>选<strong>你刚才加进"测试用户"的那个 Google 账号</strong>。</li>
+    <li>大概率会弹红字警告 <strong>"Google 未验证此应用"</strong>：
+      <ul>
+        <li>点左下角「<strong>高级 / Advanced</strong>」</li>
+        <li>再点「<strong>前往 xxx（不安全）/ Go to xxx (unsafe)</strong>」</li>
+      </ul>
+    </li>
+    <li>点「<strong>允许 / Allow</strong>」授权 <code>youtube.upload</code> 权限。</li>
+    <li>授权成功会自动跳回系统，弹绿色提示，油管那一行变成「已配置凭证」。</li>
+  </ol>
+
+  <h2 id="success">九、成功标志</h2>
+  <div class="card">
+    <ul style="margin:0">
+      <li>页面弹出：<strong>「油管 YouTube 授权成功，令牌已保存」</strong></li>
+      <li>「平台配置」表格里油管那一行的凭证状态变成 <strong>「已配置凭证」</strong>（绿色）</li>
+      <li>刷新令牌（<code>refresh_token</code>）已自动存进数据库，之后发视频不再需要重新授权</li>
+    </ul>
+  </div>
+  <p>授权成功后，回「视频发布」页选一个<strong>横屏（宽屏）</strong>视频，勾选「油管 YouTube」即可真实发布。</p>
+
+  <h2 id="errors">十、易错点汇总（踩坑大全）</h2>
+  <table>
+    <tr><th style="width:26%">坑</th><th>现象 / 原因</th><th style="width:42%">解决办法</th></tr>
+    <tr>
+      <td><strong>fetch failed</strong></td>
+      <td>点授权后报「授权失败：fetch failed」，后端连不上 Google</td>
+      <td>翻墙软件切到「<strong>全局 / TUN 模式</strong>」，让后端也走代理</td>
+    </tr>
+    <tr>
+      <td><strong>找不到 External → Create</strong></td>
+      <td>Google 改版了，老教程的按钮没了</td>
+      <td>改去左侧菜单 <code>Branding</code> + <code>Audience</code> 配置</td>
+    </tr>
+    <tr>
+      <td><strong>回调地址填错框</strong></td>
+      <td>报 "Invalid Origin: must not contain a path"</td>
+      <td>回调地址填在 <code>Authorized redirect URIs</code>，<code>JavaScript origins</code> 留空</td>
+    </tr>
+    <tr>
+      <td><strong>回调地址不匹配</strong></td>
+      <td>Google 报 redirect_uri_mismatch</td>
+      <td>填的和系统里一字不差：<code>http://localhost:5001/platform/youtube/oauth/callback</code></td>
+    </tr>
+    <tr>
+      <td><strong>"应用未验证"</strong></td>
+      <td>授权时弹红字警告</td>
+      <td>点「高级」→「前往 xxx（不安全）」继续</td>
+    </tr>
+    <tr>
+      <td><strong>授权不了 / 账号被拒</strong></td>
+      <td>账号没加进测试用户</td>
+      <td>去 <code>Audience → Test users</code> 加自己的邮箱</td>
+    </tr>
+    <tr>
+      <td><strong>后端没启动</strong></td>
+      <td>点授权后回调地址打不开</td>
+      <td>确保后端跑在 5001 端口（回调地址就是后端的地址）</td>
+    </tr>
+  </table>
+
+  <h2 id="terms">十一、名词对照表</h2>
+  <table>
+    <tr><th>我们的系统字段</th><th>Google 的叫法</th><th>说明</th></tr>
+    <tr><td><code>appId</code></td><td><code>Client ID</code> / 客户端 ID</td><td>应用唯一标识</td></tr>
+    <tr><td><code>appSecret</code></td><td><code>Client Secret</code> / 客户端密钥</td><td>应用密钥</td></tr>
+    <tr><td><code>refreshToken</code></td><td><code>refresh_token</code></td><td>油管发布时必须的刷新令牌（授权后自动保存）</td></tr>
+    <tr><td>回调地址</td><td>Redirect URI</td><td><code>http://localhost:5001/platform/youtube/oauth/callback</code></td></tr>
+  </table>
+
+  <div class="card" style="margin-top:24px">
+    <p style="margin:0;font-size:14px;color:#6b7280">
+      本文档对应项目：视频多平台上传系统（油管 YouTube 平台接入）。
+      完整分平台教程见 <code>PLATFORM_TUTORIAL.md</code>，接口细节见 <code>PLATFORM_CONFIG.md</code>。
+    </p>
+  </div>
+
+</div>
+
+<footer>油管 YouTube 接入教程 · 含新版界面与全部易错点 · 更新于 2026-08-17</footer>
+
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TikTok 海外版接入教程 · 获取令牌全流程</title>
+<style>
+  :root { --primary:#010101; --accent:#fe2c55; --dark:#1f2937; --text:#374151; --bg:#f8fafc; --border:#e5e7eb; --blue:#2563eb; --green:#16a34a; --amber:#d97706; --code-bg:#0f172a; --code-fg:#e2e8f0; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; color:var(--text); background:var(--bg); line-height:1.75; }
+  header { background:linear-gradient(135deg,#010101 0%,#2b2b2b 100%); color:#fff; padding:48px 24px; text-align:center; border-bottom:4px solid var(--accent); }
+  header h1 { margin:0 0 8px; font-size:30px; }
+  header p { margin:0; opacity:.92; font-size:15px; }
+  .container { max-width:860px; margin:0 auto; padding:32px 20px 80px; }
+  h2 { color:var(--dark); font-size:24px; margin:48px 0 16px; padding-left:14px; border-left:5px solid var(--accent); }
+  h3 { color:var(--dark); font-size:19px; margin:32px 0 12px; }
+  h4 { color:#111827; font-size:16px; margin:20px 0 8px; }
+  p { margin:10px 0; }
+  ol,ul { margin:10px 0; padding-left:26px; }
+  li { margin:6px 0; }
+  code { background:#eef2f7; border:1px solid var(--border); border-radius:5px; padding:1px 7px; font-family:Consolas,"Courier New",monospace; font-size:.9em; color:#111; }
+  pre { background:var(--code-bg); color:var(--code-fg); padding:14px 16px; border-radius:8px; overflow-x:auto; font-family:Consolas,"Courier New",monospace; font-size:14px; line-height:1.6; }
+  pre code { background:none; border:none; color:inherit; padding:0; }
+  .card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:18px 22px; margin:16px 0; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .tip,.warn,.danger { border-radius:8px; padding:14px 18px; margin:16px 0; border-left:5px solid; }
+  .tip { background:#eff6ff; border-color:var(--blue); }
+  .warn { background:#fffbeb; border-color:var(--amber); }
+  .danger { background:#fef2f2; border-color:var(--accent); }
+  .tip::before { content:"💡 提示："; font-weight:700; color:var(--blue); }
+  .warn::before { content:"⚠️ 易错："; font-weight:700; color:var(--amber); }
+  .danger::before { content:"❗ 关键："; font-weight:700; color:var(--accent); }
+  table { border-collapse:collapse; width:100%; margin:16px 0; background:#fff; }
+  th,td { border:1px solid var(--border); padding:9px 12px; text-align:left; font-size:14px; }
+  th { background:#f1f5f9; color:var(--dark); font-weight:600; }
+  .toc { background:#fff; border:1px solid var(--border); border-radius:10px; padding:18px 24px; }
+  .toc a { color:var(--blue); text-decoration:none; }
+  .toc a:hover { text-decoration:underline; }
+  footer { text-align:center; color:#9ca3af; font-size:13px; padding:24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TikTok 海外版接入教程</h1>
+  <p>从零申请应用 → 拿 Client Key / Secret → 授权拿到令牌（仅窄屏，强制 PKCE）</p>
+</header>
+
+<div class="container">
+
+  <div class="toc">
+    <h3 style="margin-top:0">📑 目录</h3>
+    <ol>
+      <li><a href="#intro">平台介绍</a></li>
+      <li><a href="#prepare">第 0 步：翻墙准备</a></li>
+      <li><a href="#account">第 1 步：注册开发者账号 &amp; 创建应用</a></li>
+      <li><a href="#product">第 2 步：添加 Content Posting API 产品</a></li>
+      <li><a href="#callback">第 3 步：配置回调地址</a></li>
+      <li><a href="#fill">第 4 步：填进系统「平台配置」页</a></li>
+      <li><a href="#auth">第 5 步：点「授权」完成授权</a></li>
+      <li><a href="#success">成功标志</a></li>
+      <li><a href="#errors">易错点汇总</a></li>
+      <li><a href="#terms">名词对照表</a></li>
+    </ol>
+  </div>
+
+  <h2 id="intro">一、平台介绍</h2>
+  <p>TikTok（抖音海外版）只支持<strong>窄屏（竖屏）</strong>，用的是 <strong>TikTok Content Posting API</strong>，并且<strong>强制使用 PKCE</strong>（无需 client_secret 也能安全授权，本系统已自动处理）。</p>
+
+  <h2 id="prepare">二、第 0 步：翻墙准备</h2>
+  <div class="danger">
+    TikTok 是海外平台，<strong>浏览器和后端都需要能访问</strong>。授权、发布都要后端调 TikTok 接口，如果后端连不上会报 <code>授权失败：fetch failed</code>。
+  </div>
+  <p>把翻墙软件切到「<strong>全局 / TUN 模式</strong>」，让所有程序（包括 Node 后端）都走代理，不要用「系统代理 / PAC」模式。</p>
+
+  <h2 id="account">三、第 1 步：注册开发者账号 &amp; 创建应用</h2>
+  <ol>
+    <li>打开 <a href="https://developers.tiktok.com" target="_blank">TikTok for Developers</a>，登录（通常需要海外账号）。</li>
+    <li>进入 <strong>My Apps</strong>，创建应用。</li>
+    <li>应用创建后，在应用详情页能看到：
+      <ul>
+        <li><strong>Client Key</strong> → 对应系统的 <code>appId</code></li>
+        <li><strong>Client Secret</strong> → 对应系统的 <code>appSecret</code></li>
+      </ul>
+    </li>
+  </ol>
+
+  <h2 id="product">四、第 2 步：添加 Content Posting API 产品</h2>
+  <ol>
+    <li>在应用详情里找到 <strong>「Content Posting API」</strong>，点 <strong>Add product / 添加</strong>。</li>
+    <li>有些账号需要先完成企业验证或提交审核才能启用。</li>
+  </ol>
+
+  <h2 id="callback">五、第 3 步：配置回调地址</h2>
+  <p>在应用的 <strong>Login Kit / Redirect URI</strong> 配置中填写：</p>
+  <pre><code>http://localhost:5001/platform/tiktok/oauth/callback</code></pre>
+
+  <h2 id="fill">六、第 4 步：填进系统「平台配置」页</h2>
+  <ol>
+    <li>打开系统「平台配置」页，找到「<strong>TikTok 海外版</strong>」，点「<strong>配置</strong>」。</li>
+    <li>填两项，其它留空：
+      <ul>
+        <li><strong>应用ID</strong> ← <strong>Client Key</strong></li>
+        <li><strong>应用密钥 client_secret</strong> ← <strong>Client Secret</strong></li>
+      </ul>
+    </li>
+    <li>点「<strong>保存</strong>」。</li>
+  </ol>
+
+  <h2 id="auth">七、第 5 步：点「授权」完成授权</h2>
+  <ol>
+    <li>TikTok 那一行点「<strong>授权</strong>」，跳转 TikTok 授权页，授权 <code>video.publish</code>。</li>
+    <li>系统会自动处理 PKCE（<code>code_challenge</code> / <code>code_verifier</code>），你无需手动操作。</li>
+    <li>授权成功自动回填 <code>accessToken</code> + <code>refreshToken</code> + <code>openId</code>。</li>
+  </ol>
+
+  <h2 id="success">八、成功标志</h2>
+  <div class="card">
+    <ul style="margin:0">
+      <li>页面弹出：<strong>「TikTok 海外版 授权成功，令牌已保存」</strong></li>
+      <li>表格里「TikTok 海外版」变成 <strong>「已配置凭证」</strong></li>
+    </ul>
+  </div>
+
+  <h2 id="errors">九、易错点汇总</h2>
+  <table>
+    <tr><th style="width:26%">坑</th><th>现象 / 原因</th><th style="width:42%">解决办法</th></tr>
+    <tr><td><strong>fetch failed</strong></td><td>后端连不上 TikTok</td><td>翻墙切「全局 / TUN 模式」</td></tr>
+    <tr><td><strong>token 过期</strong></td><td>发布时提示过期</td><td>access_token 约 24 小时，先点「刷新令牌」</td></tr>
+    <tr><td><strong>产品没添加</strong></td><td>授权时没有发布权限</td><td>先 Add product：Content Posting API</td></tr>
+    <tr><td><strong>上传地址失效</strong></td><td>上传超时</td><td>上传地址 1 小时有效，及时上传</td></tr>
+  </table>
+
+  <h2 id="terms">十、名词对照表</h2>
+  <table>
+    <tr><th>系统字段</th><th>TikTok 的叫法</th><th>说明</th></tr>
+    <tr><td><code>appId</code></td><td><code>Client Key</code></td><td>应用标识</td></tr>
+    <tr><td><code>appSecret</code></td><td><code>Client Secret</code></td><td>应用密钥</td></tr>
+    <tr><td><code>accessToken</code></td><td><code>access_token</code></td><td>访问令牌（24h 过期）</td></tr>
+    <tr><td>PKCE</td><td>code_challenge / code_verifier</td><td>系统自动生成，无需手动处理</td></tr>
+  </table>
+
+</div>
+
+<footer>TikTok 海外版接入教程 · 更新于 2026-08-17</footer>
+
+</body>
+</html>

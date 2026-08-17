@@ -7,6 +7,10 @@ import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { MenuModule } from './menu/menu.module';
 import { ImgUploadModule } from './img-upload/img-upload.module';
+import { PlatformModule } from './platform/platform.module';
+import { VideoUploadModule } from './video-upload/video-upload.module';
+import { PublishModule } from './publish/publish.module';
+import { VideoLibraryModule } from './video-library/video-library.module';
 
 @Module({
   imports: [
@@ -21,7 +25,10 @@ import { ImgUploadModule } from './img-upload/img-upload.module';
     AuthModule,
     MenuModule,
     ImgUploadModule,
-    
+    PlatformModule,
+    VideoUploadModule,
+    PublishModule,
+    VideoLibraryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment variables (do not commit secrets)
+.env
+.env.*
+!.env.example
+
+# Database (SQLite)
+*.sqlite
+*.sqlite3
+*.db
+
+# Uploaded files (runtime data)
+backend/uploads/
+
+# Claude Code local settings
+.claude/
+
+# Backups
+备份/
+backup/
+*.zip
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

@@ -21,8 +21,13 @@ export class KuaishouAdapter implements IPlatformAdapter {
   readonly meta = PLATFORMS.find((p) => p.code === this.code)!
   readonly requiresPkce = false
 
+  // 快手需 accessToken + appId 才算配置完成
+  isConfigured(config: PlatformConfigLike): boolean {
+    return !!config.accessToken && !!config.appId
+  }
+
   async publish(input: PublishVideoInput, config: PlatformConfigLike): Promise<PublishResult> {
-    if (!config.accessToken || !config.appId) {
+    if (!this.isConfigured(config)) {
       await sleep(1500)
       return makeMockResult(this.code, input.title)
     }

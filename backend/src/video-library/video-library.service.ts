@@ -48,6 +48,33 @@ export class VideoLibraryService {
     return { msg: '删除成功' }
   }
 
+  // 重复检测：按内容哈希分组，返回哈希相同但存在多条记录的分组（不含封面等大字段）
+  async findDuplicates() {
+    const all = await this.videoRepo.find({ order: { id: 'DESC' } })
+    const groups = new Map<string, Video[]>()
+    for (const v of all) {
+      if (!v.videoHash) continue
+      const arr = groups.get(v.videoHash) || []
+      arr.push(v)
+      groups.set(v.videoHash, arr)
+    }
+    const duplicates = [...groups.values()]
+      .filter((arr) => arr.length > 1)
+      .map((arr) => ({
+        hash: arr[0].videoHash,
+        count: arr.length,
+        items: arr.map((v) => ({
+          id: v.id,
+          title: v.title,
+          videoFilename: v.videoFilename,
+          videoSize: v.videoSize,
+          orientation: v.orientation,
+          createTime: v.createTime,
+        })),
+      }))
+    return { total: duplicates.length, groups: duplicates }
+  }
+
   // 按内容哈希去重入库：同一视频内容只保留一条记录，重复发布时刷新元数据
   async recordFromPublish(data: RecordVideoInput) {
     let existing: Video | null = null

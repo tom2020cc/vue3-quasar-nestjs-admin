@@ -13,8 +13,10 @@
 - [二、油管 YouTube](#二油管-youtube)
 - [三、TikTok 海外版](#三tiktok-海外版)
 - [四、快手](#四快手-kuaishou)
-- [五、发布状态轮询是怎么工作的](#五发布状态轮询是怎么工作的)
-- [六、常见问题排查](#六常见问题排查)
+- [五、Facebook](#五facebook)
+- [六、Instagram（需对象存储）](#六instagram需对象存储)
+- [七、发布状态轮询是怎么工作的](#七发布状态轮询是怎么工作的)
+- [八、常见问题排查](#八常见问题排查)
 
 ---
 
@@ -34,17 +36,19 @@
 > 回调地址（本地开发）统一为：
 > `http://localhost:5001/platform/<平台编码>/oauth/callback`
 >
-> 四个平台的编码分别是：`douyin_cn` / `youtube` / `tiktok` / `kuaishou`。
+> 六个平台的编码分别是：`douyin_cn` / `youtube` / `tiktok` / `kuaishou` / `facebook` / `instagram`。
 
 **名词对照表**（同一个东西，各家叫法不同）：
 
-| 通用概念 | 抖音 | 油管 | TikTok | 快手 |
-| -------- | ---- | ---- | ------ | ---- |
-| 应用 ID | `client_key` | `client_id` | `client_key` | `app_id` |
-| 应用密钥 | `client_secret` | `client_secret` | `client_secret` | `app_secret` |
-| 用户令牌 | `access_token` | `access_token` | `access_token` | `access_token` |
-| 刷新令牌 | `refresh_token` | `refresh_token` | `refresh_token` | `refresh_token` |
-| 用户标识 | `open_id` | —（无需） | `open_id` | `open_id` |
+| 通用概念 | 抖音 | 油管 | TikTok | 快手 | Facebook | Instagram |
+| -------- | ---- | ---- | ------ | ---- | -------- | --------- |
+| 应用 ID | `client_key` | `client_id` | `client_key` | `app_id` | `App ID` | `App ID` |
+| 应用密钥 | `client_secret` | `client_secret` | `client_secret` | `app_secret` | `App Secret` | `App Secret` |
+| 用户令牌 | `access_token` | `access_token` | `access_token` | `access_token` | `User Token`（60 天） | `User Token`（60 天） |
+| 刷新令牌 | `refresh_token` | `refresh_token` | `refresh_token` | `refresh_token` | —（无，过期重新授权） | —（无，过期重新授权） |
+| 用户/资源标识 | `open_id` | —（无需） | `open_id` | `open_id` | `pageId`（Page ID） | `igUserId`（专业账号 ID） |
+
+> Facebook 与 Instagram 同属 Meta，共用一个 Meta 应用（App ID / App Secret），只是申请的能力与授权的资源不同：Facebook 发布到 **Page**，Instagram 发布到**绑定 Page 的 IG 专业账号**。
 
 ---
 
@@ -152,7 +156,8 @@ TikTok 只支持**窄屏（竖屏）**，用的是 **TikTok Content Posting API*
 
 ### 2. 添加产品 / 申请能力
 
-- 在应用详情里找到 **「Content Posting API」** 产品，点击 **Add product / 添加**。
+- 在应用详情里找到 **「Content Posting API」** 产品，点击 **Add product / 添加**（对应 `video.publish` 权限，用于发布）。
+- 若要使用左侧「**TikTok 视频**」栏目拉取已发布视频，还需额外添加 **「Video List」** 产品并申请 `video.list` 权限；仅发布则不需要。
 - 有些账号需要先完成企业验证或提交审核才能启用。
 
 ### 3. 配置回调地址（Redirect URI）
@@ -216,7 +221,121 @@ TikTok 只支持**窄屏（竖屏）**，用的是 **TikTok Content Posting API*
 
 ---
 
-## 五、发布状态轮询是怎么工作的
+## 五、Facebook
+
+Facebook 支持**宽屏和窄屏**，用的是 **Meta Graph API**，把视频发到你自己的 **Facebook Page（公共主页）**。
+
+### 1. 注册 Meta 开发者 & 创建 App
+
+1. 打开 **Meta for Developers**：https://developers.facebook.com ，用你的 Facebook 账号登录。
+2. 「我的应用 → 创建应用」，应用类型选 **Business（商务）**。
+3. 创建后在「应用设置 → 基本信息」拿到：
+   - **App ID**（对应系统 `appId`）
+   - **App Secret**（对应 `appSecret`）
+
+### 2. 添加 Facebook Login & 申请页面发布权限
+
+1. 应用里点「添加产品」，选择 **Facebook Login**（勾选 Facebook Login for Business 的「配置」）。
+2. 在「应用审核 → 权限和功能」中申请（Development Mode 下默认可直接用）：
+   - `pages_show_list` —— 读取你的 Page 列表
+   - `pages_read_engagement` —— 读取 Page 互动数据
+   - `pages_manage_posts` —— 发布到 Page（**核心**）
+
+### 3. 配置回调地址
+
+在「Facebook Login → 设置」的 **有效 OAuth 跳转 URI** 中，精确填写：
+
+```
+http://localhost:5001/platform/facebook/oauth/callback
+```
+
+### 4. 准备 Facebook Page
+
+- 账号名下要有一个 **Page（公共主页）**，没有就先建一个。
+- 你必须是该 Page 的**管理员**，否则授权时看不到该 Page。
+
+### 5. 在本系统授权
+
+1. 打开「平台配置」页，找到「Facebook」，点「配置」，填 `appId`（App ID）、`appSecret`（App Secret），保存。
+2. 点「授权」，跳转 Meta 授权页，选择你的 Page 并同意。
+3. 授权成功后自动回填：系统用授权码换 **60 天长期 token**，再拉 `me/accounts` 拿到 **Page Token + pageId**，全部写入配置。
+
+### 6. 发布
+
+回「视频发布」页，选宽屏或窄屏视频，勾选「Facebook」发布。发布走**可断点续传上传**（start → 分片 transfer → finish），完成后轮询 `status.video_status` 直到 `ready`。
+
+**注意事项**：
+- 发布**必须用 Page Access Token**，用户 token 会报 `#100 No permission`——本系统已自动完成「用户 token → 页面 token」的转换，你无需手动处理。
+- Meta 令牌约 **60 天过期且无刷新机制**，过期后在本页重新点「授权」即可。
+- Development Mode 只有 App 成员能授权；要给他人用，需对方自建 App，或把他加为 App「测试用户」。
+
+---
+
+## 六、Instagram（需对象存储）
+
+Instagram 只支持**窄屏（竖屏）**，用的是 **Content Publishing API**，且**必须配合对象存储**（IG 要求视频先有公网 URL，不能直接上传二进制）。
+
+### 1. 注册 Meta 开发者 & 创建 App
+
+同 Facebook，一个 Meta App 即可共用。拿到 **App ID / App Secret**。
+
+### 2. 申请 Instagram 发布权限
+
+在「应用审核 → 权限和功能」中申请（Development Mode 下默认可直接用）：
+
+- `instagram_business_basic` —— 读取 IG 专业账号信息
+- `instagram_business_content_publish` —— 发布内容（**核心**）
+
+> 旧权限 `instagram_basic` / `instagram_content_publish` 已于 2025-01 废弃，务必用上面两个新权限。
+
+### 3. 配置回调地址
+
+在 OAuth 设置中加入：
+
+```
+http://localhost:5001/platform/instagram/oauth/callback
+```
+
+### 4. 准备账号资产（专业账号 + 绑定 Page）
+
+1. 把 Instagram 账号切换为**专业账号**（IG 里：设置 → 账号类型和工具 → 切换为专业账号 → 选 Business）。
+2. 把该 IG 账号**绑定**到你的一个 Facebook Page（在 Meta 专业账户中心里关联）。
+
+> 普通个人号无法通过 API 发布；Reels 通过 API 发布目前仅支持 **Business** 账号（Creator 不支持）。
+
+### 5. 配置对象存储（Instagram 专属，必做）
+
+IG 发布时系统会先把视频上传到对象存储、生成公网 URL 再交给 IG 抓取。任选一个 **S3 兼容**存储（AWS S3 / 阿里云 OSS / 腾讯云 COS / MinIO 等），在 `backend/.env` 填入：
+
+| 变量 | 说明 | 示例 |
+| ---- | ---- | ---- |
+| `STORAGE_ENDPOINT` | 存储端点（含协议） | `https://oss-cn-hangzhou.aliyuncs.com`（MinIO：`http://localhost:9000`） |
+| `STORAGE_REGION` | 区域 | `oss-cn-hangzhou` 或 `us-east-1` |
+| `STORAGE_BUCKET` | 桶名 | `my-video-bucket` |
+| `STORAGE_ACCESS_KEY` | AccessKey | 从云厂商控制台获取 |
+| `STORAGE_SECRET_KEY` | SecretKey | 同上 |
+| `STORAGE_URL_EXPIRES` | 预签名 URL 有效期（秒） | `172800`（48h） |
+
+> 桶需**公网可读**（预签名 URL 让 IG 在有效期内抓取）。本地开发可用 MinIO 自建；生产建议用云厂商 OSS/COS。填好后**重启后端**生效。
+
+### 6. 在本系统授权
+
+1. 打开「平台配置」页，找到「Instagram」，填 `appId` / `appSecret`，保存。
+2. 点「授权」，跳转 Meta 授权页，选择你的 **IG 专业账号**和关联 Page，同意授权。
+3. 授权成功后自动回填：系统通过 Page 反查 `instagram_business_account.id` 得到 **igUserId**，连同 60 天 token 一并写入配置。
+
+### 7. 发布
+
+回「视频发布」页，选**窄屏**视频，勾选「Instagram」发布。系统会先上传对象存储 → 创建 IG 容器 → 轮询 `status_code` → `FINISHED` 后 `media_publish`。
+
+**注意事项**：
+- **必须专业账号 + 绑定 Page + 对象存储公网 URL**，三者缺一不可。
+- 限流：每账号 **25 条 / 24 小时**，批量发布请分批控制节奏。
+- 视频抓取失败（`Error 36003`）通常是对象存储 URL 非公网或已过期，检查 `STORAGE_*` 与桶权限。
+
+---
+
+## 七、发布状态轮询是怎么工作的
 
 视频发布到平台后，平台不是立即返回「成功」，而是要经历**转码 / 审核**等异步过程。因此系统把发布拆成两段：
 
@@ -240,18 +359,18 @@ TikTok 只支持**窄屏（竖屏）**，用的是 **TikTok Content Posting API*
 | `POLL_INTERVAL_MS` | `15000` | 每轮轮询间隔（毫秒） |
 | `POLL_MAX_ATTEMPTS` | `20` | 单条记录最多轮询次数，超时标记失败 |
 
-- **真实平台**：轮询调用各家 `queryStatus`（抖音查 `video/data`、油管查 `videos?part=processingDetails`、TikTok 查 `status/fetch`、快手查视频列表）。
+- **真实平台**：轮询调用各家 `queryStatus`（抖音查 `video/data`、油管查 `videos?part=processingDetails`、TikTok 查 `status/fetch`、快手查视频列表、Facebook 查 `status.video_status`、Instagram 查容器 `status_code` 后触发 `media_publish`）。
 - **模拟发布（未配凭证）**：本地模拟「处理中 → 完成」，第 2 次轮询即成功，便于你观察整个轮询过程。
 
 ---
 
-## 六、常见问题排查
+## 八、常见问题排查
 
 **1. 点「授权」后跳转报「redirect_uri 不匹配 / 未登记」？**
 → 各平台控制台填的回调地址必须与 `backend/.env` 的 `BACKEND_BASE_URL` 拼出的地址**完全一致**（油管/TikTok 校验完整路径，抖音/快手通常只校验域名）。
 
 **2. 授权成功但发布仍走「模拟模式」？**
-→ 检查该平台是否**缺关键凭证**：抖音要 `accessToken+openId`、油管要 `refreshToken`、TikTok/快手要 `accessToken`。缺少即触发模拟发布。
+→ 检查该平台是否**缺关键凭证**：抖音要 `accessToken+openId`、油管要 `refreshToken`、TikTok/快手要 `accessToken`、Facebook 要 `accessToken + pageId`、Instagram 要 `accessToken + igUserId`。缺少即触发模拟发布。
 
 **3. 油管授权后没有 `refreshToken`？**
 → 确认授权地址带 `access_type=offline`（本系统已带）。若之前授权过，Google 可能不再重复下发，需要到 Google 账号的「第三方应用权限」里移除授权后重新授权。
@@ -264,3 +383,12 @@ TikTok 只支持**窄屏（竖屏）**，用的是 **TikTok Content Posting API*
 
 **6. 本地回调域名能用 `localhost` 吗？**
 → 油管/TikTok 允许 localhost；抖音/快手也支持本地调试。生产环境需换成已备案域名 + HTTPS。
+
+**7. Facebook 发布报 `#100 No permission`？**
+→ 说明用了用户 token 而非 Page token。确认授权时选了 Page，且「平台配置」里 `pageId` 已回填；仍异常可重新「授权」让系统重新拉取 Page token。
+
+**8. Instagram 发布报 `Error 36003`（无法抓取视频）？**
+→ 对象存储 URL 非公网或已过期。确认 `STORAGE_*` 配置正确、桶允许公网读取、预签名 URL 未过期；本地测试确保后端能访问到 MinIO/OSS 且 IG 能访问该公网地址。
+
+**9. Instagram 授权后拿不到 IG 账号（`instagram_business_account` 为空）？**
+→ 通常是 IG 账号未切换为专业账号、或未绑定 Facebook Page。按「六、Instagram 第 4 步」检查账号资产后重新授权。

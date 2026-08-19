@@ -4,16 +4,30 @@
       <!-- 左：新建发布 -->
       <div class="col-12 col-md-5">
         <q-card flat bordered>
-          <q-card-section>
-            <div class="text-h6">视频发布</div>
-            <div class="text-caption text-grey-7 q-mt-xs">
-              宽屏视频可发：国产抖音、油管；窄屏视频可发：抖音、TikTok、快手
+          <q-card-section class="row items-center">
+            <div>
+              <div class="text-h6">视频发布</div>
+              <div class="text-caption text-grey-7 q-mt-xs">
+                宽屏视频可发：国产抖音、油管、Facebook；窄屏视频可发：抖音、TikTok、快手、Facebook、Instagram
+              </div>
             </div>
+            <q-space />
+            <q-btn-toggle
+              v-model="publishMode"
+              toggle-color="primary"
+              unelevated
+              no-caps
+              :options="[
+                { label: '单个发布', value: 'single' },
+                { label: '批量发布', value: 'batch' },
+              ]"
+            />
           </q-card-section>
           <q-separator />
 
           <q-card-section class="q-gutter-md">
-            <!-- 选择视频 -->
+            <!-- 单个模式：选择视频 → 预览 → 尺寸 → 标题 -->
+            <div v-if="publishMode === 'single'" class="q-gutter-md">
             <q-file
               v-model="videoFile"
               accept="video/*"
@@ -77,8 +91,58 @@
               />
             </div>
 
-            <!-- 标题 / 描述 -->
+            <!-- 标题 -->
             <q-input v-model="title" outlined dense label="视频标题" :rules="[(v) => !!v || '标题不能为空']" />
+            </div>
+
+            <!-- 批量模式：多选文件 + 逐文件标题/尺寸 + 上传进度 -->
+            <div v-else class="q-gutter-md">
+              <q-file
+                v-model="batchFilePicker"
+                accept="video/*"
+                outlined
+                dense
+                label="选择多个视频（可多选）"
+                multiple
+                clearable
+                :disable="batchUploading"
+                @update:model-value="onBatchFilesChange"
+              >
+                <template v-slot:prepend><q-icon name="movie" /></template>
+              </q-file>
+
+              <div
+                v-for="(b, idx) in batchItems"
+                :key="fileId(b.file)"
+                class="q-pa-sm rounded-borders"
+                style="border: 1px solid rgba(0, 0, 0, 0.12)"
+              >
+                <div class="row items-center q-gutter-sm">
+                  <q-icon :name="b.detecting ? 'hourglass_top' : 'movie'" color="primary" />
+                  <span class="text-subtitle2 ellipsis" style="flex: 1; min-width: 0">{{ b.file.name }}</span>
+                  <q-badge :color="b.orientation === 'landscape' ? 'info' : 'purple'" outline>
+                    {{ b.orientation === 'landscape' ? '宽屏' : '窄屏' }}
+                  </q-badge>
+                  <q-btn flat dense round icon="delete" color="negative" @click="removeBatchItem(idx)" />
+                </div>
+                <q-input v-model="b.title" dense outlined label="标题" class="q-mt-sm" />
+                <div v-if="!b.detecting" class="text-caption text-grey-7 q-mt-xs">
+                  {{ b.width }} × {{ b.height }} px · {{ formatDuration(b.duration) }}
+                </div>
+              </div>
+
+              <div v-if="batchUploading">
+                <div class="row items-center q-mb-xs">
+                  <q-icon name="cloud_upload" color="primary" />
+                  <span class="q-ml-sm">{{ batchProgressLabel }}</span>
+                  <q-space />
+                  <span class="text-caption text-grey-7">{{ uploadLabel }}</span>
+                </div>
+                <q-linear-progress :value="uploadPercent / 100" color="primary" track-color="grey-3" rounded size="18px" />
+              </div>
+            </div>
+
+            <!-- 描述（单个/批量共用） -->
             <q-input v-model="description" outlined dense type="textarea" autogrow label="视频描述（可选）" />
 
             <!-- 选择平台 -->
@@ -98,7 +162,7 @@
                     class="platform-card cursor-pointer"
                     :class="{
                       'platform-card--selected': selectedPlatforms.includes(p.code),
-                      'platform-card--disabled': p.available === false || !p.orientations.includes(orientation),
+                      'platform-card--disabled': isPlatformDisabled(p),
                     }"
                     @click="togglePlatform(p)"
                   >
@@ -124,7 +188,7 @@
                           {{ o === 'landscape' ? '宽屏' : '窄屏' }}
                         </q-badge>
                         <q-badge v-if="p.available === false" color="negative" outline>暂不可用</q-badge>
-                        <q-badge v-else-if="!p.orientations.includes(orientation)" color="grey" outline>当前尺寸不支持</q-badge>
+                        <q-badge v-else-if="publishMode === 'single' && !p.orientations.includes(orientation)" color="grey" outline>当前尺寸不支持</q-badge>
                       </div>
                       <div v-if="p.available === false" class="text-caption text-negative q-mt-xs">{{ p.unavailableReason }}</div>
                     </q-card-section>
@@ -140,6 +204,7 @@
 
           <q-card-actions align="right" class="q-pa-md">
             <q-btn
+              v-if="publishMode === 'single'"
               color="primary"
               icon="send"
               label="发布"
@@ -147,6 +212,16 @@
               :disable="!videoFile || !title || selectedPlatforms.length === 0"
               :loading="uploading"
               @click="onPublish"
+            />
+            <q-btn
+              v-else
+              color="primary"
+              icon="send"
+              label="批量发布"
+              unelevated
+              :disable="batchItems.length === 0 || selectedPlatforms.length === 0"
+              :loading="batchUploading"
+              @click="onBatchPublish"
             />
           </q-card-actions>
         </q-card>
@@ -158,7 +233,7 @@
           <q-card-section class="row items-center">
             <div class="text-h6">发布任务</div>
             <q-space />
-            <q-btn flat dense round icon="refresh" @click="loadTasks" :loading="taskLoading" />
+            <q-btn flat dense round icon="refresh" @click="loadTasks()" :loading="taskLoading" />
           </q-card-section>
           <q-separator />
 
@@ -255,10 +330,12 @@ import {
   getUploadedChunks,
   mergeChunks,
   createPublishTask,
+  createPublishTaskBatch,
   getPublishTasks,
   getPublishTask,
   retryPublishTask,
   removePublishTask,
+  type CreatePublishTaskPayload,
   type PublishTask,
   type PublishTaskDetail,
   type VideoUploadResult,
@@ -298,12 +375,53 @@ const uploadPercent = ref(0)
 const uploadStage = ref<'idle' | 'uploading' | 'merging'>('idle')
 const uploadLabel = ref('')
 
-// 切换尺寸方向时，默认勾选该方向支持的所有平台
+// ---- 批量发布 ----
+const publishMode = ref<'single' | 'batch'>('single')
+const batchFilePicker = ref<File[]>([])
+const batchItems = ref<BatchItem[]>([])
+const batchUploading = ref(false)
+const batchProgressLabel = ref('')
+
+// 批量模式下单个待发布文件（含自动检测的尺寸与封面）
+interface BatchItem {
+  file: File
+  title: string
+  width: number
+  height: number
+  duration: number
+  orientation: 'landscape' | 'portrait'
+  cover?: string
+  detecting: boolean
+}
+
+// 切换尺寸方向时，默认勾选该方向支持的所有平台（仅单个模式）
 watch(orientation, (val) => {
+  if (publishMode.value !== 'single') return
   selectedPlatforms.value = platforms.value
     .filter((p) => p.available !== false && p.orientations.includes(val))
     .map((p) => p.code)
 })
+
+// 读取视频宽高/时长（用于宽屏/窄屏判断）
+function readVideoMeta(file: File): Promise<{ width: number; height: number; duration: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.src = url
+    video.onloadedmetadata = () => {
+      const width = video.videoWidth
+      const height = video.videoHeight
+      const duration = video.duration && isFinite(video.duration) ? video.duration : 0
+      URL.revokeObjectURL(url)
+      resolve({ width, height, duration })
+    }
+    video.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('无法读取视频信息'))
+    }
+  })
+}
 
 async function onFileChange(file: File | null) {
   if (!file) return
@@ -312,18 +430,15 @@ async function onFileChange(file: File | null) {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   previewUrl.value = URL.createObjectURL(file)
 
-  // 读取视频宽高/时长以判断宽屏/窄屏
-  const video = document.createElement('video')
-  video.preload = 'metadata'
-  video.src = previewUrl.value
-  await new Promise((resolve, reject) => {
-    video.onloadedmetadata = () => resolve(null)
-    video.onerror = reject
-  })
-  videoWidth.value = video.videoWidth
-  videoHeight.value = video.videoHeight
-  videoDuration.value = video.duration && isFinite(video.duration) ? video.duration : 0
-  orientation.value = video.videoWidth >= video.videoHeight ? 'landscape' : 'portrait'
+  try {
+    const meta = await readVideoMeta(file)
+    videoWidth.value = meta.width
+    videoHeight.value = meta.height
+    videoDuration.value = meta.duration
+    orientation.value = meta.width >= meta.height ? 'landscape' : 'portrait'
+  } catch {
+    // 读取失败时保留默认值
+  }
 
   // 异步抓取封面（不阻塞选择流程）
   captureCover(file).then((dataUrl) => {
@@ -338,22 +453,35 @@ function platformMeta(code: string): { icon: string; color: string } {
     youtube: { icon: 'smart_display', color: 'red' },
     tiktok: { icon: 'music_video', color: 'dark' },
     kuaishou: { icon: 'bolt', color: 'orange' },
+    facebook: { icon: 'groups', color: 'blue' },
+    instagram: { icon: 'photo_camera', color: 'pink' },
   }
   return map[code] || { icon: 'public', color: 'grey' }
 }
 
-// 点击平台卡片切换选择（不支持的尺寸直接忽略）
+// 平台卡片是否禁用（批量模式下不按尺寸禁用，尺寸兼容在发布时逐文件过滤）
+function isPlatformDisabled(p: PlatformMeta) {
+  if (p.available === false) return true
+  if (publishMode.value === 'single' && !p.orientations.includes(orientation.value)) return true
+  return false
+}
+
+// 点击平台卡片切换选择（禁用的平台直接忽略）
 function togglePlatform(p: PlatformMeta) {
-  if (p.available === false || !p.orientations.includes(orientation.value)) return
+  if (isPlatformDisabled(p)) return
   const idx = selectedPlatforms.value.indexOf(p.code)
   if (idx >= 0) selectedPlatforms.value.splice(idx, 1)
   else selectedPlatforms.value.push(p.code)
 }
 
-// 全选当前尺寸下所有可用平台
+// 全选可用平台（单个模式按当前尺寸过滤，批量模式全选可用平台）
 function selectAllCompatible() {
   selectedPlatforms.value = platforms.value
-    .filter((p) => p.available !== false && p.orientations.includes(orientation.value))
+    .filter((p) => {
+      if (p.available === false) return false
+      if (publishMode.value === 'single') return p.orientations.includes(orientation.value)
+      return true
+    })
     .map((p) => p.code)
 }
 
@@ -523,6 +651,135 @@ async function onPublish() {
   } finally {
     uploading.value = false
     uploadStage.value = 'idle'
+  }
+}
+
+// ---- 批量发布 ----
+// 去掉扩展名作为默认标题
+function baseName(name: string): string {
+  const i = name.lastIndexOf('.')
+  return i > 0 ? name.slice(0, i) : name
+}
+
+// 批量文件选择：q-file 回传完整列表，按 fileId 复用已检测项、增量检测新项
+async function onBatchFilesChange(files: File[] | null) {
+  const list = files || []
+  const prevMap = new Map(batchItems.value.map((b) => [fileId(b.file), b]))
+  const next: BatchItem[] = []
+  for (const file of list) {
+    const key = fileId(file)
+    const prev = prevMap.get(key)
+    if (prev && !prev.detecting) {
+      next.push(prev)
+    } else {
+      const item: BatchItem = {
+        file,
+        title: baseName(file.name),
+        width: 0,
+        height: 0,
+        duration: 0,
+        orientation: 'landscape',
+        detecting: true,
+      }
+      next.push(item)
+      detectBatchItem(item)
+    }
+  }
+  batchItems.value = next
+}
+
+// 检测单个批量文件的尺寸/时长并抓取封面
+async function detectBatchItem(item: BatchItem) {
+  try {
+    const meta = await readVideoMeta(item.file)
+    item.width = meta.width
+    item.height = meta.height
+    item.duration = meta.duration
+    item.orientation = meta.width >= meta.height ? 'landscape' : 'portrait'
+  } catch {
+    // 检测失败保留默认值
+  } finally {
+    item.detecting = false
+  }
+  captureCover(item.file).then((dataUrl) => {
+    if (dataUrl) item.cover = dataUrl
+  })
+}
+
+// 移除某个批量项，并同步 q-file 的选中列表
+function removeBatchItem(idx: number) {
+  const removed = batchItems.value[idx]
+  if (!removed) return
+  batchItems.value.splice(idx, 1)
+  batchFilePicker.value = batchFilePicker.value.filter((f) => fileId(f) !== fileId(removed.file))
+}
+
+// 批量发布：逐文件上传 → 按尺寸过滤兼容平台 → 一次性提交批量任务
+async function onBatchPublish() {
+  if (batchItems.value.length === 0) {
+    Notify.create({ type: 'warning', message: '请先选择要发布的视频' })
+    return
+  }
+  if (selectedPlatforms.value.length === 0) {
+    Notify.create({ type: 'warning', message: '请至少选择一个目标平台' })
+    return
+  }
+
+  const compatibleOf = (orientation: string) =>
+    selectedPlatforms.value.filter((code) => {
+      const p = platforms.value.find((x) => x.code === code)
+      return !!p && p.available !== false && p.orientations.includes(orientation)
+    })
+
+  batchUploading.value = true
+  batchProgressLabel.value = ''
+  const items: CreatePublishTaskPayload[] = []
+  const skipped: string[] = []
+  try {
+    for (let i = 0; i < batchItems.value.length; i++) {
+      const b = batchItems.value[i]
+      batchProgressLabel.value = `上传中 ${i + 1}/${batchItems.value.length}`
+      const compatible = compatibleOf(b.orientation)
+      if (compatible.length === 0) {
+        skipped.push(b.title)
+        continue
+      }
+      const up = await uploadWithResume(b.file)
+      items.push({
+        title: b.title,
+        description: description.value,
+        videoFilename: up.filename,
+        orientation: b.orientation,
+        width: b.width,
+        height: b.height,
+        videoHash: up.hash,
+        duration: b.duration,
+        cover: b.cover || undefined,
+        platforms: compatible,
+      })
+    }
+
+    if (items.length === 0) {
+      Notify.create({ type: 'warning', message: '没有可发布的视频（所选视频与平台尺寸不兼容）' })
+      return
+    }
+
+    const res = await createPublishTaskBatch(items)
+    const data = res.data
+    const skipText = skipped.length ? `，跳过 ${skipped.length} 个（尺寸不兼容）` : ''
+    Notify.create({
+      type: data.failed === 0 ? 'positive' : 'warning',
+      message: `批量发布完成：成功 ${data.success}，失败 ${data.failed}${skipText}`,
+    })
+    batchItems.value = []
+    batchFilePicker.value = []
+    setTimeout(loadTasks, 1200)
+    setTimeout(loadTasks, 4000)
+  } catch (e: any) {
+    Notify.create({ type: 'negative', message: e.response?.data?.message || '批量发布失败' })
+  } finally {
+    batchUploading.value = false
+    batchProgressLabel.value = ''
   }
 }
 

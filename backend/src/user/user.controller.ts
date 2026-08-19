@@ -21,7 +21,6 @@ export class UserController {
   @ApiOperation({summary:'获取一条用户信息',description:'根据id值获取用户信息'})
   @Get(':id')
   findOne(@Param('id',ParseIntPipe) id: number) {
-    console.log(typeof(id))
     return this.userService.findOneById(id);
   }
 

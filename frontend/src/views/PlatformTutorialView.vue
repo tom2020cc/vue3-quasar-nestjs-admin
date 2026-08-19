@@ -2,7 +2,7 @@
   <q-page padding>
     <div class="text-h6">平台接入教程</div>
     <div class="text-caption text-grey-7 q-mt-xs q-mb-md">
-      四个平台从「申请应用 → 拿凭证 → 授权」的完整教程。可切换标签查看，也可点「新窗口打开」查看独立页面。
+      六个平台从「申请应用 → 拿凭证 → 授权」的完整教程，以及通用防封号注意事项。可切换标签查看，也可点「新窗口打开」查看独立页面。
     </div>
 
     <q-tabs
@@ -20,35 +20,45 @@
       />
     </q-tabs>
 
-    <div class="row items-center q-mb-sm q-gutter-sm">
-      <q-badge color="grey-6" outline>{{ currentTab?.name }} 教程</q-badge>
-      <q-space />
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="open_in_new"
-        label="新窗口打开"
-        @click="openInNew"
-      />
-    </div>
+    <!-- 防封号标签：内联渲染共享指南 -->
+    <PlatformGuideCard v-if="active === 'anti-ban'" />
 
-    <iframe
-      :src="`/guides/${active}.html`"
-      class="tutorial-frame"
-      title="平台接入教程"
-    />
+    <!-- 平台教程标签：iframe 加载对应 HTML 教程 -->
+    <template v-else>
+      <div class="row items-center q-mb-sm q-gutter-sm">
+        <q-badge color="grey-6" outline>{{ currentTab?.name }} 教程</q-badge>
+        <q-space />
+        <q-btn
+          flat
+          dense
+          color="primary"
+          icon="open_in_new"
+          label="新窗口打开"
+          @click="openInNew"
+        />
+      </div>
+
+      <iframe
+        :src="`/guides/${active}.html`"
+        class="tutorial-frame"
+        title="平台接入教程"
+      />
+    </template>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import PlatformGuideCard from '@/components/PlatformGuideCard.vue'
 
 const tabs = [
   { code: 'douyin', name: '国产抖音', icon: 'music_note' },
   { code: 'youtube', name: '油管 YouTube', icon: 'smart_display' },
   { code: 'tiktok', name: 'TikTok', icon: 'music_video' },
   { code: 'kuaishou', name: '快手', icon: 'bolt' },
+  { code: 'facebook', name: 'Facebook', icon: 'groups' },
+  { code: 'instagram', name: 'Instagram', icon: 'photo_camera' },
+  { code: 'anti-ban', name: '防封号 & 注意事项', icon: 'shield' },
 ]
 
 const active = ref('youtube')

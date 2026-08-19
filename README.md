@@ -1,47 +1,6 @@
 # Quasar + NestJS 后台管理系统
 
-一个前后端分离的轻量后台管理系统示例，前端使用 **Vue 3 + Quasar**（桌面风格 UI），后端使用 **NestJS**，数据库使用 **SQLite**（零配置、无需额外安装数据库软件）。实现了登录鉴权、用户 / 菜单的增删改查、菜单树形展示、图片上传等完整功能，并在此基础上扩展了**视频多平台上传工具**（上传一个视频自动分发到油管 / TikTok 等平台，并集中管理已发布视频），前后端已互相联通，可直接运行。
-
----
-
-## 视频多平台上传工具
-
-本项目在基础后台之上，新增了**视频多平台上传**能力：上传一个视频，按「宽屏 / 窄屏」自动匹配目标平台，一次分发到多个平台，并集中管理各平台已发布视频。
-
-### 用途
-
-把同一个视频一键分发到 油管（YouTube）/ TikTok 等平台，免去逐个平台手动上传；统一查看各平台已发布视频（封面 / 时长 / 播放 / 点赞等数据）。
-
-### 使用方法
-
-1. 在「平台配置」页填写各平台凭证（appId / appSecret）并完成 OAuth 授权；
-2. 在「视频发布」页上传视频，选择「宽屏 / 窄屏」自动匹配平台，一键发布；
-3. 在「视频库」「油管视频」「TikTok 视频」栏目查看已发布 / 已上传的视频。
-
-分步教程见 [PLATFORM_TUTORIAL.md](./PLATFORM_TUTORIAL.md)，各平台接口 / 字段 / 授权流程见 [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md)。
-
-### 栏目一览
-
-| 栏目 | 说明 |
-| ---- | ---- |
-| 视频发布 | 上传视频 → 选宽屏 / 窄屏 → 自动匹配平台 → 一键发布，支持分片断点续传、内容哈希去重 |
-| 平台配置 | 各平台凭证（appId / appSecret / 令牌）填写与 OAuth 授权 |
-| 视频库 | 已上传视频的集中记录（尺寸 / 时长 / 封面 / 哈希），发布时自动入库去重 |
-| 油管视频 | 拉取已授权油管账号频道下的所有视频（封面 / 时长 / 数据） |
-| TikTok 视频 | 拉取已授权 TikTok 账号已发布的视频（封面 / 时长 / 数据） |
-
-### 平台 ↔ 尺寸映射
-
-| 视频类型 | 目标平台 |
-| -------- | -------- |
-| 宽屏（横屏） | 国产抖音 + 油管（YouTube） |
-| 窄屏（竖屏） | 抖音 + TikTok + 快手 |
-
-> 抖音、快手需**企业资质**才能接入开放平台，个人开发者暂不可用（已在页面内说明原因并置灰）。油管 / TikTok 面向个人开发者即可接入。
-
-### 踩坑与解决
-
-开发过程中遇到的问题与解决思路（油管封面 / 授权 scope / 分片续传等）见 [开发问题与解决方案.md](./开发问题与解决方案.md)。
+一个前后端分离的轻量后台管理系统示例，前端使用 **Vue 3 + Quasar**（桌面风格 UI），后端使用 **NestJS**，数据库使用 **SQLite**（零配置、无需额外安装数据库软件）。实现了登录鉴权、用户 / 菜单的增删改查、菜单树形展示以及图片上传等完整功能，前后端已互相联通，可直接运行。
 
 ---
 
@@ -55,6 +14,9 @@
 | 用户管理 | 用户的增、删、改、查（列表 / 新增 / 编辑 / 删除，编辑时密码留空则不修改） |
 | 菜单管理 | 菜单的增、删、改、查，支持「表格 / 树形」两种视图切换，树形按父子层级展示并可直接为某节点新增子菜单、编辑、删除 |
 | 图片上传 | 单图上传、多图上传（最多 3 张），上传后返回访问地址并预览，菜单图标也可上传图片 |
+| 视频多平台发布 | 上传视频后自动识别宽屏/窄屏，按尺寸匹配目标平台（宽屏→国产抖音/油管/Facebook；窄屏→抖音/TikTok/快手/Instagram），支持单个与批量发布，含任务列表与各平台发布记录 |
+| 视频库 | 发布时自动入库（按内容哈希去重），集中查看封面、尺寸、时长，支持详情与删除；内置重复检测与一键清理冗余 |
+| 平台视频管理 | 授权后一键拉取已授权油管频道 / TikTok 账号下已发布的视频列表 |
 
 ### 2. 技术栈
 
@@ -98,7 +60,11 @@ quasar_nestjs_admin/
 │       ├── auth/              # 登录 / 注册 / JWT 鉴权
 │       ├── user/              # 用户 CRUD（实体 + DTO）
 │       ├── menu/              # 菜单 CRUD
-│       └── img-upload/        # 图片上传（单图 / 多图）
+│       ├── img-upload/        # 图片上传（单图 / 多图）
+│       ├── platform/          # 平台配置 + 各平台上传适配器（抖音/油管/TikTok/快手）+ 油管/TikTok 视频拉取
+│       ├── video-upload/      # 视频文件上传（分片上传 + 断点续传）
+│       ├── video-library/     # 视频库（发布时自动入库，按哈希去重）
+│       └── publish/           # 发布任务 / 平台发布记录 / 状态轮询
 └── frontend/                  # Vue3 + Quasar 前端（端口 5173）
     ├── .env                   # 前端环境变量（后端接口地址）
     ├── package.json
@@ -114,10 +80,10 @@ quasar_nestjs_admin/
         ├── router/index.ts    # 路由定义 + 登录守卫
         ├── stores/myToken.ts  # Pinia token 存储
         ├── utils/request.ts   # axios 实例（token 注入、401 拦截）
-        ├── api/               # 接口封装（users / menus / uploads）
+        ├── api/               # 接口封装（users / menus / uploads / platform / publish / videoLibrary / youtube / tiktok）
         ├── layouts/MainLayout.vue        # 后台布局（侧边栏 + 顶部栏）
         ├── components/ImageUpload.vue    # 单图上传组件
-        └── views/             # 登录 / 首页 / 用户管理 / 菜单管理 / 图片上传 / 404
+        └── views/             # 登录 / 首页 / 用户管理 / 菜单管理 / 图片上传 / 视频发布 / 平台配置 / 接入教程 / 视频库 / 油管视频 / TikTok 视频 / 404
 ```
 
 ---
@@ -140,25 +106,6 @@ npm install -g pnpm
 ---
 
 ## 四、快速开始（操作方法）
-
-### 方式 A：一键脚本（推荐，Windows）
-
-项目根目录提供三个一键脚本，双击即可使用，无需手动敲命令：
-
-| 脚本 | 作用 |
-| ---- | ---- |
-| `install-all.bat` | 一键安装前后端全部依赖（自动检测 pnpm / Node，依次执行 `pnpm install`） |
-| `start-all.bat` | 一键启动前后端（各开一个窗口：后端 5001、前端 5173） |
-| `stop-all.bat` | 一键关闭前后端（按窗口标题 + 端口双重清理） |
-
-**新电脑首次使用：**
-
-1. 双击 `install-all.bat`（只需一次，自动装好前后端依赖）
-2. 双击 `start-all.bat` 启动前后端
-3. 浏览器打开 <http://localhost:5173> 登录
-4. 用完双击 `stop-all.bat` 关闭
-
-> 以下「第 1 步 ~ 第 4 步」为手动命令方式，效果与方式 A 完全等价。
 
 ### 第 1 步：安装依赖
 
@@ -251,6 +198,19 @@ VITE v5.x.x  ready in xxx ms
 | 变量 | 默认值 | 说明 |
 | ---- | ------ | ---- |
 | `BACKEND_PORT` | `5001` | 后端监听端口（默认 5001，避免与其它项目占用 5000 冲突） |
+| `BACKEND_BASE_URL` | `http://localhost:5001` | 后端对外的基地址（用于生成 OAuth 回调地址，需在各平台控制台登记） |
+| `FRONTEND_URL` | `http://localhost:5173` | 前端地址（OAuth 授权完成后跳回前端） |
+| `POLL_INTERVAL_MS` | `15000` | 发布状态轮询间隔（毫秒） |
+| `POLL_MAX_ATTEMPTS` | `20` | 单条发布记录最多轮询次数（超时标记失败） |
+| `DB_SYNCHRONIZE` | `true` | 是否自动同步数据库表结构（开发 `true`；生产务必 `false` 并改用 migration） |
+| `JWT_SECRET` | 占位符 | JWT 签名密钥（生产环境务必替换为随机强密钥） |
+| `JWT_EXPIRES_IN` | `6000s` | JWT 有效期 |
+| `STORAGE_ENDPOINT` | 空 | 对象存储端点（S3/OSS/COS 兼容地址；Instagram 发布需要） |
+| `STORAGE_REGION` | `us-east-1` | 对象存储区域 |
+| `STORAGE_BUCKET` | 空 | 存储桶名称 |
+| `STORAGE_ACCESS_KEY` | 空 | 对象存储 AccessKey |
+| `STORAGE_SECRET_KEY` | 空 | 对象存储 SecretKey |
+| `STORAGE_URL_EXPIRES` | `172800` | 预签名 URL 有效期（秒，默认 48h） |
 
 ### 前端 `frontend/.env`
 
@@ -281,6 +241,25 @@ VITE v5.x.x  ready in xxx ms
 | DELETE | `/menus/:id` | 删除菜单 | 是 |
 | POST | `/img-upload/img` | 单图上传（字段 `file`） | 是 |
 | POST | `/img-upload/imgs` | 多图上传（字段 `files`，最多 3 张） | 是 |
+| GET | `/platform/list` | 平台定义列表（编码/支持尺寸/所需配置字段） | 是 |
+| GET | `/platform` | 平台配置列表（元信息 + 凭证） | 是 |
+| PATCH | `/platform/:id` | 更新平台凭证 / 启用状态 | 是 |
+| POST | `/video-upload/video` | 上传视频（字段 `file`，最大 500MB） | 是 |
+| POST | `/publish` | 创建发布任务（异步发布到所选平台） | 是 |
+| POST | `/publish/batch` | 批量创建发布任务（逐条隔离失败，返回成功/失败统计） | 是 |
+| GET | `/publish` | 发布任务列表 | 是 |
+| GET | `/publish/:id` | 任务详情（含各平台发布记录） | 是 |
+| POST | `/publish/:id/retry` | 重试失败/跳过的平台 | 是 |
+| DELETE | `/publish/:id` | 删除发布任务 | 是 |
+| GET | `/platform/:code/oauth/url` | 获取 OAuth 授权跳转地址 | 是 |
+| GET | `/platform/:code/oauth/callback` | OAuth 授权回调（换 token 存库） | 否 |
+| POST | `/platform/:code/oauth/refresh` | 刷新访问令牌 | 是 |
+| GET | `/video-library` | 视频库列表 | 是 |
+| GET | `/video-library/duplicates` | 视频库重复检测（按内容哈希分组） | 是 |
+| GET | `/video-library/:id` | 视频库详情 | 是 |
+| DELETE | `/video-library/:id` | 删除视频库记录 | 是 |
+| GET | `/youtube/videos` | 拉取已授权油管频道视频 | 是 |
+| GET | `/tiktok/videos` | 拉取已授权 TikTok 视频 | 是 |
 
 > 除登录 / 注册外，其余接口需携带请求头 `Authorization: Bearer <token>`。前端 axios 已自动注入，无需手动处理。
 
@@ -327,7 +306,43 @@ pnpm build
 
 ---
 
-## 十、默认账号与安全提示
+## 十、视频多平台发布
+
+左侧菜单新增「视频发布」与「平台配置」两个页面：
+
+1. **视频发布**：选择视频文件 → 自动识别宽屏/窄屏（可手动切换）→ 填写标题 → 勾选目标平台 → 发布。顶部可切换「单个 / 批量」两种模式：批量模式一次多选文件，自动逐文件识别尺寸并按尺寸过滤兼容平台后一次性提交。右侧任务列表可查看发布状态、各平台结果，支持重试与删除。
+2. **平台配置**：维护各平台（国产抖音、油管、TikTok、快手、Facebook、Instagram）的接入凭证与启用状态；点「授权」可跳转到各平台授权页，走 OAuth 授权码流程自动回填令牌（无需手动粘贴 token）。其中 **Instagram 需先配置对象存储**（见下文「对象存储配置」），因为 IG 要求视频提供公网 URL。
+3. **视频库**：发布成功的视频会自动入库（按内容哈希去重），集中查看封面、尺寸、时长等信息；点「重复检测」可查看按内容哈希分组的重复记录，并一键清理冗余（每组保留最新一条）。
+4. **油管视频 / TikTok 视频**：授权后一键拉取对应账号频道下已发布的视频列表。
+
+### 对象存储配置（Instagram 发布需要）
+
+Instagram 通过 Content Publishing API 发布时，要求视频先有**公网可访问的 URL**，不能直接上传二进制。系统在发布前会把视频上传到 **S3 兼容对象存储**（AWS S3 / 阿里云 OSS / 腾讯云 COS / MinIO 均可）并生成预签名 GET URL。在 `backend/.env` 填入：
+
+| 变量 | 说明 | 示例 |
+| ---- | ---- | ---- |
+| `STORAGE_ENDPOINT` | 存储端点（含协议） | `https://oss-cn-hangzhou.aliyuncs.com`（MinIO：`http://localhost:9000`） |
+| `STORAGE_REGION` | 区域 | `oss-cn-hangzhou` 或 `us-east-1` |
+| `STORAGE_BUCKET` | 桶名 | `my-video-bucket` |
+| `STORAGE_ACCESS_KEY` | AccessKey | 云厂商控制台获取 |
+| `STORAGE_SECRET_KEY` | SecretKey | 同上 |
+| `STORAGE_URL_EXPIRES` | 预签名 URL 有效期（秒） | `172800` |
+
+> 桶需**公网可读**（预签名 URL 让 IG 在有效期内抓取），填好后重启后端。Facebook / 油管 / TikTok / 抖音 / 快手直接上传二进制，**无需**对象存储。
+
+### Facebook / Instagram 联调前置
+
+两者共用 **Meta（Facebook）** 开放平台，需在 [Meta for Developers](https://developers.facebook.com) 创建 **Business 类型应用**并完成授权：
+
+- **Facebook**：申请 `pages_show_list` / `pages_read_engagement` / `pages_manage_posts`，名下需有 Page（公共主页）且为管理员；发布走 Page Access Token。
+- **Instagram**：申请 `instagram_business_basic` / `instagram_business_content_publish`，IG 需为**专业账号（Business）**并绑定 FB Page；发布需先配置上面的对象存储。
+- Meta 令牌约 60 天过期且无刷新机制，过期后在本系统「平台配置」页重新点「授权」。
+
+> 平台接入凭证、各平台官方接口流程、如何新增平台的完整说明见 **[PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md)**；「注册账号 → 建应用 → 拿凭证 → 授权 → 发布」的分平台手把手教程见 **[PLATFORM_TUTORIAL.md](./PLATFORM_TUTORIAL.md)**。未配置真实凭证时，发布走「模拟模式」，仅演示流程。
+
+---
+
+## 十一、默认账号与安全提示
 
 - 默认管理员：`admin@qq.com / admin123`，仅用于演示，**生产环境请务必修改密码**。
-- 后端 JWT 密钥在 `backend/src/auth/constants.ts` 中，生产环境请替换为自己的随机密钥。
+- 后端 JWT 密钥在 `backend/.env` 的 `JWT_SECRET` 中配置，生产环境请替换为自己的随机密钥。

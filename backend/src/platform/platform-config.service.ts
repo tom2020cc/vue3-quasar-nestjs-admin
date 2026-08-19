@@ -21,15 +21,18 @@ export class PlatformConfigService implements OnApplicationBootstrap {
     private readonly configRepo: Repository<PlatformConfig>,
   ) {}
 
-  // 启动时若配置表为空，则按平台元信息写入 4 条默认配置（凭证留空，演示时走模拟发布）
+  // 启动时按平台元信息补齐缺失的默认配置（凭证留空，演示时走模拟发布）。
+  // 幂等：已有配置不覆盖，仅补齐新增平台（如后续接入 Facebook / Instagram）。
   async onApplicationBootstrap() {
-    const count = await this.configRepo.count()
-    if (count === 0) {
-      const seeds = PLATFORMS.map((p: PlatformMeta) =>
+    const existing = await this.configRepo.find()
+    const existingCodes = new Set(existing.map((c) => c.code))
+    const missing = PLATFORMS.filter((p: PlatformMeta) => !existingCodes.has(p.code))
+    if (missing.length > 0) {
+      const seeds = missing.map((p: PlatformMeta) =>
         this.configRepo.create({ code: p.code, name: p.name, enabled: p.available }),
       )
       await this.configRepo.save(seeds)
-      console.log('已初始化平台配置：' + PLATFORMS.map((p) => p.code).join(' / '))
+      console.log('已补充平台配置：' + missing.map((p) => p.code).join(' / '))
     }
   }
 
@@ -86,6 +89,9 @@ export class PlatformConfigService implements OnApplicationBootstrap {
     if (tokens.openId) config.openId = tokens.openId
     if (tokens.expiresIn) {
       config.tokenExpiresAt = new Date(Date.now() + tokens.expiresIn * 1000)
+    }
+    if (tokens.extra) {
+      config.extra = { ...(config.extra || {}), ...tokens.extra }
     }
     return this.configRepo.save(config)
   }

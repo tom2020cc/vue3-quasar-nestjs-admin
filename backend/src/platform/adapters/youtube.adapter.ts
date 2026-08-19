@@ -44,9 +44,13 @@ export class YoutubeAdapter implements IPlatformAdapter {
   readonly meta = PLATFORMS.find((p) => p.code === this.code)!
   readonly requiresPkce = false // 服务端应用使用 client_secret，无需 PKCE
 
+  // 油管必须有 refreshToken 才算配置完成（发布时再实时换 access_token）
+  isConfigured(config: PlatformConfigLike): boolean {
+    return !!config.refreshToken
+  }
+
   async publish(input: PublishVideoInput, config: PlatformConfigLike): Promise<PublishResult> {
-    // 未配置刷新令牌 → 走模拟发布，便于本地联调
-    if (!config.refreshToken) {
+    if (!this.isConfigured(config)) {
       await sleep(1500)
       return makeMockResult(this.code, input.title)
     }

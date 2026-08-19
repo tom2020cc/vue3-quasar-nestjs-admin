@@ -4,6 +4,8 @@ import { YoutubeAdapter } from './youtube.adapter'
 import { DouyinAdapter } from './douyin.adapter'
 import { TiktokAdapter } from './tiktok.adapter'
 import { KuaishouAdapter } from './kuaishou.adapter'
+import { FacebookAdapter } from './facebook.adapter'
+import { InstagramAdapter } from './instagram.adapter'
 
 // 平台适配器工厂：按平台编码分发到对应适配器
 // 新增平台时，在此构造函数中注册即可
@@ -16,12 +18,16 @@ export class PlatformAdapterFactory {
     douyin: DouyinAdapter,
     tiktok: TiktokAdapter,
     kuaishou: KuaishouAdapter,
+    facebook: FacebookAdapter,
+    instagram: InstagramAdapter,
   ) {
     this.map = {
       [youtube.code]: youtube,
       [douyin.code]: douyin,
       [tiktok.code]: tiktok,
       [kuaishou.code]: kuaishou,
+      [facebook.code]: facebook,
+      [instagram.code]: instagram,
     }
   }
 

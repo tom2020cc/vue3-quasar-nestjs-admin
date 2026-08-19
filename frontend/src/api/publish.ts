@@ -112,6 +112,27 @@ export const mergeChunks = (payload: {
 export const createPublishTask = (data: CreatePublishTaskPayload) =>
   request<PublishTask>({ method: 'POST', url: '/publish', data })
 
+// 批量发布返回项
+export interface BatchPublishResultItem {
+  index: number
+  ok: boolean
+  taskId?: number
+  message?: string
+}
+
+// 批量发布返回
+export interface BatchPublishResult {
+  msg: string
+  total: number
+  success: number
+  failed: number
+  results: BatchPublishResultItem[]
+}
+
+// 批量创建发布任务
+export const createPublishTaskBatch = (items: CreatePublishTaskPayload[]) =>
+  request<BatchPublishResult>({ method: 'POST', url: '/publish/batch', data: { items } })
+
 // 发布任务列表
 export const getPublishTasks = () =>
   request<PublishTask[]>({ method: 'GET', url: '/publish' })

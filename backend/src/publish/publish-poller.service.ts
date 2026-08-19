@@ -11,6 +11,9 @@ import { PublishService } from './publish.service'
 import { PlatformConfigService } from '../platform/platform-config.service'
 import { PlatformAdapterFactory } from '../platform/adapters/platform-adapter.factory'
 
+// 单轮轮询的并发上限
+const POLL_CONCURRENCY = 5
+
 // 发布状态轮询服务
 // 发布接口是异步的：视频提交到平台后需经历转码/审核，最终状态需周期性查询。
 // 本服务用原生 setInterval 周期扫描「processing」状态的记录，调用各平台
@@ -53,7 +56,7 @@ export class PublishPollerService implements OnApplicationBootstrap, OnApplicati
     return Number.isFinite(v) && v > 0 ? v : 20
   }
 
-  // 一轮轮询：找出所有处理中的记录，逐条查询并落库，最后汇总任务状态
+  // 一轮轮询：找出所有处理中的记录，并发查询并落库，最后汇总任务状态
   async poll() {
     if (this.running) return
     this.running = true
@@ -62,10 +65,11 @@ export class PublishPollerService implements OnApplicationBootstrap, OnApplicati
       if (records.length === 0) return
 
       const taskIds = new Set<number>()
-      for (const record of records) {
-        taskIds.add(record.taskId)
-        await this.pollOne(record)
-      }
+      for (const record of records) taskIds.add(record.taskId)
+
+      // 并发轮询（带并发上限，避免一次性打满外部平台接口）
+      await this.runWithConcurrency(records, (record) => this.pollOne(record), POLL_CONCURRENCY)
+
       // 每条记录状态变化后，重新汇总其所属任务状态
       for (const taskId of taskIds) {
         await this.publishService.updateTaskStatus(taskId)
@@ -73,6 +77,26 @@ export class PublishPollerService implements OnApplicationBootstrap, OnApplicati
     } finally {
       this.running = false
     }
+  }
+
+  // 以固定并发度执行任务，单个失败不影响其余项
+  private async runWithConcurrency<T>(
+    items: T[],
+    worker: (item: T) => Promise<void>,
+    limit: number,
+  ) {
+    let index = 0
+    const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (index < items.length) {
+        const item = items[index++]
+        try {
+          await worker(item)
+        } catch (e) {
+          console.error('轮询单条记录异常：', e)
+        }
+      }
+    })
+    await Promise.allSettled(runners)
   }
 
   private async pollOne(record: PublishRecord) {

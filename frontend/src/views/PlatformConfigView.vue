@@ -83,6 +83,9 @@
       </q-table>
     </q-card>
 
+    <!-- 接入注意事项 & 防封号指南 -->
+    <PlatformGuideCard class="q-mt-md" />
+
     <!-- 配置对话框 -->
     <q-dialog v-model="dialog">
       <q-card style="min-width: 520px">
@@ -130,6 +133,7 @@ import {
   type PlatformWithConfig,
 } from '@/api/platform'
 import { API_BASE_URL } from '@/utils/request'
+import PlatformGuideCard from '@/components/PlatformGuideCard.vue'
 
 const rows = ref<PlatformWithConfig[]>([])
 const loading = ref(false)
@@ -143,6 +147,7 @@ const route = useRoute()
 const router = useRouter()
 // 回调地址基地址（后端地址，需登记到各平台控制台）
 const backendBase = computed(() => API_BASE_URL)
+
 const form = reactive({
   enabled: true,
   appId: '',
@@ -223,6 +228,8 @@ function hasCredential(row: PlatformWithConfig) {
   if (!c) return false
   if (row.code === 'youtube') return !!c.refreshToken
   if (row.code === 'douyin_cn') return !!c.accessToken && !!c.openId
+  if (row.code === 'facebook') return !!c.accessToken && !!(c.extra?.pageId || c.openId)
+  if (row.code === 'instagram') return !!c.accessToken && !!(c.extra?.igUserId || c.openId)
   return !!c.accessToken
 }
 

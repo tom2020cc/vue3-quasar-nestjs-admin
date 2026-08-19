@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsArray, IsIn, IsNumber, IsOptional, IsString } from 'class-validator'
+import { Type } from 'class-transformer'
+import {
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator'
 
 export class CreatePublishTaskDto {
   @ApiProperty({ description: '视频标题', example: '我的第一个视频' })
@@ -53,4 +62,18 @@ export class CreatePublishTaskDto {
   })
   @IsArray()
   platforms: string[]
+}
+
+// 批量发布请求体：一次提交多个视频的发布任务（逐项校验、逐项错误隔离）
+export class BatchCreatePublishTaskDto {
+  @ApiProperty({
+    description: '批量发布项（每个视频一项）',
+    type: [CreatePublishTaskDto],
+    isArray: true,
+  })
+  @IsArray()
+  @ArrayMinSize(1, { message: '批量发布至少需要 1 个视频' })
+  @ValidateNested({ each: true })
+  @Type(() => CreatePublishTaskDto)
+  items: CreatePublishTaskDto[]
 }

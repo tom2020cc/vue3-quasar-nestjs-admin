@@ -37,8 +37,13 @@ export class TiktokAdapter implements IPlatformAdapter {
   readonly meta = PLATFORMS.find((p) => p.code === this.code)!
   readonly requiresPkce = true // TikTok 强制 PKCE
 
+  // TikTok 只要有 accessToken 即可（access_token 有效期约 24h，过期需刷新）
+  isConfigured(config: PlatformConfigLike): boolean {
+    return !!config.accessToken
+  }
+
   async publish(input: PublishVideoInput, config: PlatformConfigLike): Promise<PublishResult> {
-    if (!config.accessToken) {
+    if (!this.isConfigured(config)) {
       await sleep(1500)
       return makeMockResult(this.code, input.title)
     }
@@ -76,18 +81,17 @@ export class TiktokAdapter implements IPlatformAdapter {
       throw new Error('初始化失败：' + JSON.stringify(initData))
     }
 
-    // 2. 顺序 PUT 每个分片（需携带 Content-Range）
-    const chunks = await readFileChunks(input.filePath, chunkSize)
+    // 2. 顺序 PUT 每个分片（需携带 Content-Range，流式读取避免整文件进内存）
     let offset = 0
-    for (let i = 0; i < chunks.length; i++) {
-      const end = offset + chunks[i].length - 1
+    for await (const chunk of readFileChunks(input.filePath, chunkSize)) {
+      const end = offset + chunk.length - 1
       await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': input.mime || 'video/mp4',
           'Content-Range': `bytes ${offset}-${end}/${input.size}`,
         },
-        body: chunks[i],
+        body: chunk,
       })
       offset = end + 1
     }

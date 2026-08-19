@@ -23,6 +23,12 @@ export class VideoLibraryController {
     return this.videoLibraryService.findAll()
   }
 
+  @ApiOperation({ summary: '视频库重复检测', description: '按内容哈希分组，返回存在重复记录的分组，供清理历史重复' })
+  @Get('duplicates')
+  findDuplicates() {
+    return this.videoLibraryService.findDuplicates()
+  }
+
   @ApiOperation({ summary: '视频库详情', description: '获取单个视频完整信息（含封面）' })
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {

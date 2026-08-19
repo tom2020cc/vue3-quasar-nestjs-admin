@@ -1,4 +1,5 @@
 import { readFile } from 'fs/promises'
+import { createReadStream } from 'fs'
 import { createHash, randomBytes } from 'crypto'
 
 // 通用工具：分片、读取文件、延时、OAuth 辅助（供各平台适配器使用）
@@ -42,17 +43,19 @@ export async function postForm(url: string, params: Record<string, string>) {
   return data
 }
 
-// 将文件读为 Buffer 并按 chunkSize 分片（用于各平台的分片上传）
-export async function readFileChunks(filePath: string, chunkSize: number): Promise<Buffer[]> {
-  const buf = await readFile(filePath)
-  const chunks: Buffer[] = []
-  for (let i = 0; i < buf.length; i += chunkSize) {
-    chunks.push(buf.subarray(i, i + chunkSize))
+// 流式逐片读取文件（AsyncGenerator），避免把整个视频一次性读进内存。
+// 调用方用 `for await (const chunk of readFileChunks(...))` 逐片上传，单片用完即释放。
+export async function* readFileChunks(
+  filePath: string,
+  chunkSize: number,
+): AsyncGenerator<Buffer> {
+  const stream = createReadStream(filePath, { highWaterMark: chunkSize })
+  for await (const chunk of stream) {
+    yield chunk as Buffer
   }
-  return chunks
 }
 
-// 一次性读取整个文件为 Buffer（用于单次/整体上传）
+// 一次性读取整个文件为 Buffer（用于整体单次上传的平台，如油管/快手的单次 PUT）
 export async function readFileBuffer(filePath: string): Promise<Buffer> {
   return readFile(filePath)
 }

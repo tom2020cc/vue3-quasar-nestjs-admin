@@ -1,29 +1,28 @@
 @echo off
-setlocal
-cd /d "%~dp0"
+setlocal enabledelayedexpansion
+title Stop All Servers
 
-echo ============================================================
-echo    One-Click Stop  -  Backend ^& Frontend
-echo ============================================================
-echo.
+echo ================================================
+echo   Stopping backend (5001) and frontend (5173)
+echo ================================================
 
-echo    [1/2] Closing the Backend / Frontend windows ...
-taskkill /FI "WINDOWTITLE eq Backend*" /T /F >nul 2>&1
-taskkill /FI "WINDOWTITLE eq Frontend*" /T /F >nul 2>&1
-
-echo    [2/2] Freeing ports 5001 (backend) and 5173 (frontend) ...
-call :KillPort 5001
-call :KillPort 5173
+call :killport 5001 Backend
+call :killport 5173 Frontend
 
 echo.
-echo    Done. Backend and frontend have been stopped.
-echo.
+echo Done. All project ports are closed.
+echo You can also close the two server windows.
 pause
-exit /b
+exit /b 0
 
-:KillPort
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":%1 " ^| findstr "LISTENING"') do (
-    echo        Killing process %%a on port %1 ...
-    taskkill /PID %%a /T /F >nul 2>&1
+:killport
+set "PORT=%~1"
+set "NAME=%~2"
+set "FOUND="
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr :%PORT% ^| findstr LISTENING') do (
+    echo [-] %NAME% - killing process %%P on port %PORT%
+    taskkill /F /PID %%P >nul 2>&1
+    set "FOUND=1"
 )
-exit /b
+if not defined FOUND echo [i] %NAME% - port %PORT% is not running.
+exit /b 0

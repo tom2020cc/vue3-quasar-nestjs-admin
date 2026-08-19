@@ -5,15 +5,16 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { Repository } from 'typeorm'
 import { createHash } from 'crypto'
 import { createReadStream, existsSync, statSync } from 'fs'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { PublishTask } from './entities/publish-task.entity'
 import { PublishRecord } from './entities/publish-record.entity'
 import { CreatePublishTaskDto } from './dto/create-publish-task.dto'
 import { PlatformConfigService } from '../platform/platform-config.service'
 import { PlatformAdapterFactory } from '../platform/adapters/platform-adapter.factory'
+import { S3StorageService } from '../platform/storage/s3-storage.service'
 import { Orientation } from '../platform/adapters/platform.interface'
 import { VideoLibraryService } from '../video-library/video-library.service'
 
@@ -27,6 +28,7 @@ export class PublishService implements OnApplicationBootstrap {
     private readonly configService: PlatformConfigService,
     private readonly factory: PlatformAdapterFactory,
     private readonly videoLibraryService: VideoLibraryService,
+    private readonly storage: S3StorageService,
   ) {}
 
   // 启动时把历史发布任务回填到视频库（幂等，按哈希去重），让旧数据立即可见
@@ -54,9 +56,45 @@ export class PublishService implements OnApplicationBootstrap {
     }
   }
 
-  // 创建任务：校验平台/尺寸 → 落库 → 异步触发发布（不阻塞接口返回）
-  async createAndPublish(dto: CreatePublishTaskDto) {
-    const { videoFilename, orientation } = dto
+  // 创建单个任务（对外接口）：委托给 createOne
+  createAndPublish(dto: CreatePublishTaskDto) {
+    return this.createOne(dto)
+  }
+
+  // 批量创建：逐项校验/发布，单项失败不影响其余项，并做批内内容去重
+  async createBatch(items: CreatePublishTaskDto[]) {
+    const results: Array<{ index: number; ok: boolean; taskId?: number; message?: string }> = []
+    const seenHashes = new Set<string>()
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      try {
+        // 批内去重：同一内容哈希本次批次只发布一次，避免重复提交
+        if (item.videoHash && seenHashes.has(item.videoHash)) {
+          results.push({ index: i, ok: false, message: '批内重复：与前面某项内容相同，已跳过' })
+          continue
+        }
+        if (item.videoHash) seenHashes.add(item.videoHash)
+        const task = await this.createOne(item)
+        results.push({ index: i, ok: true, taskId: task.id })
+      } catch (e: any) {
+        results.push({ index: i, ok: false, message: e?.message || '创建失败' })
+      }
+    }
+    const success = results.filter((r) => r.ok).length
+    return {
+      msg: success > 0 ? '批量发布已提交' : '批量发布失败',
+      total: items.length,
+      success,
+      failed: items.length - success,
+      results,
+    }
+  }
+
+  // 单个任务核心逻辑：校验平台/尺寸 → 落库 → 去重 → 入库 → 异步触发发布（不阻塞接口返回）
+  private async createOne(dto: CreatePublishTaskDto): Promise<PublishTask> {
+    const { orientation } = dto
+    // 文件名做 basename 归一化，防止 ../../ 路径穿越引用到 uploads 目录之外的文件
+    const videoFilename = basename(dto.videoFilename || '')
 
     // 1. 校验视频文件已上传到后端本地（且必须是文件，防止空文件名命中目录）
     if (!videoFilename) {
@@ -114,10 +152,12 @@ export class PublishService implements OnApplicationBootstrap {
     )
 
     // 4. 去重检测：同一内容在同一平台已成功发布过 → 标记为「跳过（重复）」
+    //    先一次性查出该内容已在哪些平台成功发布过（单次查询，避免逐平台查库）
+    const publishedPlatforms = await this.findPublishedPlatforms(videoHash)
     const records: PublishRecord[] = []
     for (const code of checked) {
-      const dup = await this.findDuplicate(code, videoHash)
-      if (dup) {
+      const dupTaskId = publishedPlatforms.get(code)
+      if (dupTaskId) {
         const name = this.factory.get(code)?.meta?.name || code
         records.push(
           this.recordRepo.create({
@@ -125,7 +165,7 @@ export class PublishService implements OnApplicationBootstrap {
             platform: code,
             status: 'skipped',
             duplicate: true,
-            message: `检测到重复：该视频已在「${name}」发布过（任务 #${dup.id}），已跳过`,
+            message: `检测到重复：该视频已在「${name}」发布过（任务 #${dupTaskId}），已跳过`,
           }),
         )
       } else {
@@ -134,7 +174,7 @@ export class PublishService implements OnApplicationBootstrap {
     }
     await this.recordRepo.save(records)
 
-    // 3.5 视频库入库（按内容哈希去重，重复发布只更新不新增）
+    // 5. 视频库入库（按内容哈希去重，重复发布只更新不新增）
     await this.videoLibraryService.recordFromPublish({
       title: task.title,
       description: task.description,
@@ -150,7 +190,7 @@ export class PublishService implements OnApplicationBootstrap {
       cover: task.cover,
     })
 
-    // 4. 异步执行发布
+    // 6. 异步执行发布
     this.runPublish(task.id).catch((e) => {
       console.error('发布任务执行异常：', e)
     })
@@ -210,7 +250,7 @@ export class PublishService implements OnApplicationBootstrap {
       return
     }
 
-    const config = await this.configService.findByCode(record.platform)
+    let config = await this.configService.findByCode(record.platform)
     if (!config || !config.enabled) {
       record.status = 'skipped'
       record.message = '平台未配置或未启用，已跳过'
@@ -218,10 +258,27 @@ export class PublishService implements OnApplicationBootstrap {
       return
     }
 
+    // 访问令牌临近/已经过期时，若该平台支持刷新则自动刷新并持久化（如 TikTok 的 24h 短期 token）
+    if (adapter.refresh && this.shouldRefreshToken(config)) {
+      try {
+        const tokens = await adapter.refresh(config)
+        await this.configService.saveTokens(config.code, tokens)
+        config = (await this.configService.findByCode(config.code)) || config
+      } catch (e: any) {
+        console.warn(`平台「${config.name || config.code}」访问令牌自动刷新失败：`, e?.message)
+      }
+    }
+
     record.status = 'publishing'
     await this.recordRepo.save(record)
 
     try {
+      // Instagram 等平台需要公网 URL：仅在「确实要走真实发布」时先把视频托管到对象存储，
+      // 未配置凭证走模拟发布时无需对象存储（避免因未配置 STORAGE_* 而误报失败）
+      let publicUrl: string | undefined
+      if (adapter.requiresPublicUrl && adapter.isConfigured(config)) {
+        publicUrl = await this.storage.upload(task.videoPath, 'videos/' + task.videoFilename)
+      }
       const result = await adapter.publish(
         {
           filePath: task.videoPath,
@@ -231,6 +288,7 @@ export class PublishService implements OnApplicationBootstrap {
           orientation: task.orientation as Orientation,
           title: task.title,
           description: task.description,
+          publicUrl,
         },
         config,
       )
@@ -255,14 +313,31 @@ export class PublishService implements OnApplicationBootstrap {
     await this.recordRepo.save(record)
   }
 
-  // 查询某内容是否已在指定平台成功发布过（用于重复检测）
-  private async findDuplicate(platform: string, videoHash: string | null): Promise<PublishTask | null> {
-    if (!videoHash) return null
-    const successRecords = await this.recordRepo.find({ where: { platform, status: 'success' } })
-    if (successRecords.length === 0) return null
-    const taskIds = [...new Set(successRecords.map((r) => r.taskId))]
-    const tasks = await this.taskRepo.find({ where: { id: In(taskIds) } })
-    return tasks.find((t) => t.videoHash === videoHash) ?? null
+  // 判断是否需要自动刷新访问令牌：有 refreshToken 且 token 已过期或 5 分钟内即将过期
+  private shouldRefreshToken(config: {
+    refreshToken?: string | null
+    tokenExpiresAt?: Date | null
+  }): boolean {
+    if (!config.refreshToken || !config.tokenExpiresAt) return false
+    return config.tokenExpiresAt.getTime() - Date.now() < 5 * 60 * 1000
+  }
+
+  // 查询某视频内容（按哈希）已在哪些平台成功发布过（单次查询，供去重检测）
+  private async findPublishedPlatforms(videoHash: string | null): Promise<Map<string, number>> {
+    const map = new Map<string, number>() // platform -> 已成功发布的任务 id
+    if (!videoHash) return map
+    const rows = await this.taskRepo
+      .createQueryBuilder('task')
+      .innerJoin(PublishRecord, 'record', 'record.taskId = task.id')
+      .select('record.platform', 'platform')
+      .addSelect('task.id', 'taskId')
+      .where('record.status = :status', { status: 'success' })
+      .andWhere('task.videoHash = :hash', { hash: videoHash })
+      .getRawMany()
+    for (const r of rows) {
+      if (!map.has(r.platform)) map.set(r.platform, Number(r.taskId))
+    }
+    return map
   }
 
   // 流式计算文件 SHA-256

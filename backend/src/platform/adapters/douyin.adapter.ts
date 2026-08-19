@@ -20,9 +20,13 @@ export class DouyinAdapter implements IPlatformAdapter {
   readonly meta = PLATFORMS.find((p) => p.code === this.code)!
   readonly requiresPkce = false
 
+  // 抖音必须同时具备 access_token 与 open_id 才算配置完成
+  isConfigured(config: PlatformConfigLike): boolean {
+    return !!config.accessToken && !!config.openId
+  }
+
   async publish(input: PublishVideoInput, config: PlatformConfigLike): Promise<PublishResult> {
-    // 抖音必须同时具备 access_token 与 open_id
-    if (!config.accessToken || !config.openId) {
+    if (!this.isConfigured(config)) {
       await sleep(1500)
       return makeMockResult(this.code, input.title)
     }
@@ -51,12 +55,11 @@ export class DouyinAdapter implements IPlatformAdapter {
       throw new Error('分片初始化失败：' + JSON.stringify(initData))
     }
 
-    // 2. 逐片上传（part_number 从 1 开始）
-    const chunks = await readFileChunks(input.filePath, chunkSize)
-    for (let i = 0; i < chunks.length; i++) {
-      const partNumber = i + 1
+    // 2. 逐片上传（part_number 从 1 开始，流式读取避免整文件进内存）
+    let partNumber = 1
+    for await (const chunk of readFileChunks(input.filePath, chunkSize)) {
       const form = new FormData()
-      form.append('video', new Blob([chunks[i]]), input.fileName)
+      form.append('video', new Blob([chunk]), input.fileName)
       const upRes = await fetch(
         `${base}/video/part/upload/?open_id=${openId}&upload_id=${uploadId}&part_number=${partNumber}`,
         { method: 'POST', headers: { 'access-token': token }, body: form },
@@ -64,6 +67,7 @@ export class DouyinAdapter implements IPlatformAdapter {
       if (!upRes.ok) {
         throw new Error(`分片 ${partNumber} 上传失败：${await upRes.text()}`)
       }
+      partNumber++
     }
 
     // 3. 完成分片上传，获取 video_id

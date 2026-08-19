@@ -35,6 +35,15 @@ export function guessMime(filename: string): string {
   return map[extname(filename).toLowerCase()] || 'video/mp4'
 }
 
+// 生成随机视频文件名（与单文件上传保持一致格式，供单文件/分片合并共用）
+export function randomVideoName(ext: string): string {
+  const randomName = Array(8)
+    .fill(null)
+    .map(() => Math.round(Math.random() * 9).toString(36))
+    .join('')
+  return `${Date.now()}-${randomName}${ext}`
+}
+
 export interface MergeResult {
   ok: boolean
   missing?: number[]
@@ -45,15 +54,6 @@ export interface MergeResult {
 
 @Injectable()
 export class VideoUploadService {
-  // 生成最终文件名（与单文件上传保持同格式）
-  private randomName(ext: string): string {
-    const randomName = Array(8)
-      .fill(null)
-      .map(() => Math.round(Math.random() * 9).toString(36))
-      .join('')
-    return `${Date.now()}-${randomName}${ext}`
-  }
-
   // 查询某 uploadId 已上传的分片索引（升序）
   uploadedChunks(uploadId: string): number[] {
     const dir = join(chunksDir, sanitizeUploadId(uploadId))
@@ -75,7 +75,7 @@ export class VideoUploadService {
     }
     if (missing.length > 0) return { ok: false, missing }
 
-    const finalName = this.randomName(extname(fileName) || '.mp4')
+    const finalName = randomVideoName(extname(fileName) || '.mp4')
     const finalPath = join(videoDir, finalName)
     mkdirSync(videoDir, { recursive: true })
 

@@ -19,7 +19,7 @@ import { VideoLibraryModule } from './video-library/video-library.module';
       type: 'better-sqlite3',
       database: process.env.DB_DATABASE || 'database.sqlite',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],  // 自动加载实体
-      synchronize: true, // 开发时使用，自动同步数据库表结构
+      synchronize: process.env.DB_SYNCHRONIZE !== 'false', // 由环境变量控制，生产环境置 false 避免自动改表丢数据
     }),
     UserModule,
     AuthModule,

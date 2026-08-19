@@ -19,6 +19,7 @@ import {
   chunksDir,
   sanitizeUploadId,
   guessMime,
+  randomVideoName,
 } from './video-upload.service'
 
 // 视频文件存储配置：保存到 uploads/videos 目录
@@ -27,12 +28,8 @@ mkdirSync(videoDir, { recursive: true })
 
 const storage = diskStorage({
   destination: videoDir,
-  filename: (req, file, callback) => {
-    const randomName = Array(8)
-      .fill(null)
-      .map(() => Math.round(Math.random() * 9).toString(36))
-      .join('')
-    callback(null, `${Date.now()}-${randomName}${extname(file.originalname)}`)
+  filename: (_req, file, callback) => {
+    callback(null, randomVideoName(extname(file.originalname)))
   },
 })
 

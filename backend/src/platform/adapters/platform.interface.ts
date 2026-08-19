@@ -19,6 +19,8 @@ export enum PlatformCode {
   YOUTUBE = 'youtube', // 油管 YouTube（宽屏）
   TIKTOK = 'tiktok', // 抖音海外版 TikTok（窄屏）
   KUAISHOU = 'kuaishou', // 快手（窄屏）
+  FACEBOOK = 'facebook', // Facebook Page（横屏、竖屏均支持）
+  INSTAGRAM = 'instagram', // Instagram Business（竖屏 Reels）
 }
 
 // 平台元信息：前端「平台配置页 / 发布页」依据它展示，避免前后端各写一套
@@ -72,6 +74,24 @@ export const PLATFORMS: PlatformMeta[] = [
     available: false,
     unavailableReason: '需企业资质认证，个人开发者暂不可接入',
   },
+  {
+    code: PlatformCode.FACEBOOK,
+    name: 'Facebook',
+    orientations: [Orientation.LANDSCAPE, Orientation.PORTRAIT],
+    description: 'Facebook Graph API（Page 视频上传，可恢复上传）',
+    apiBase: 'https://graph.facebook.com',
+    requiredFields: ['appId(client_id)', 'appSecret(client_secret)', 'accessToken(Page Token)'],
+    available: true,
+  },
+  {
+    code: PlatformCode.INSTAGRAM,
+    name: 'Instagram',
+    orientations: [Orientation.PORTRAIT],
+    description: 'Instagram Content Publishing API（需 Business 账号 + 对象存储托管视频）',
+    apiBase: 'https://graph.facebook.com',
+    requiredFields: ['appId(client_id)', 'appSecret(client_secret)', 'accessToken', 'videoUrl'],
+    available: true,
+  },
 ]
 
 // 需要发布到平台的视频信息（后端已把视频文件落到本地磁盘）
@@ -84,6 +104,7 @@ export interface PublishVideoInput {
   title: string
   description?: string
   coverUrl?: string
+  publicUrl?: string // 公网可访问的视频 URL（Instagram 等平台需要，由对象存储托管后回填）
 }
 
 export interface PublishResult {
@@ -122,6 +143,7 @@ export interface OAuthTokenResult {
   refreshToken?: string
   openId?: string
   expiresIn?: number // 秒
+  extra?: Record<string, any> // 额外回写（如 Facebook pageId / pageAccessToken，Instagram igUserId）
 }
 
 // OAuth2 授权码流程：每个平台实现「构建授权地址 → 授权码换令牌 → 刷新令牌」
@@ -149,6 +171,11 @@ export interface IOAuthProvider {
 export interface IPlatformAdapter extends IOAuthProvider {
   readonly code: PlatformCode
   readonly meta: PlatformMeta
+  // 发布前是否需要先把视频托管到对象存储（默认 false；Instagram 需要公网 URL）
+  readonly requiresPublicUrl?: boolean
+  // 是否已具备真实发布所需的凭证（true 才走真实接口；false 走模拟发布）。
+  // 发布服务据此决定是否托管公网 URL、是否需要对象存储。
+  isConfigured(config: PlatformConfigLike): boolean
   publish(input: PublishVideoInput, config: PlatformConfigLike): Promise<PublishResult>
   // 查询发布最终状态（部分平台发布为异步，需轮询落库）
   queryStatus?(params: {

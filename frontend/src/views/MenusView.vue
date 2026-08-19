@@ -54,7 +54,7 @@
       <!-- 树形视图 -->
       <div v-else class="q-pa-md">
         <q-tree
-          :nodes="treeData"
+          :nodes="treeData as any"
           node-key="id"
           default-expand-all
           no-connectors

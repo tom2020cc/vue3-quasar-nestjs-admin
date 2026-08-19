@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { PublishService } from './publish.service'
-import { CreatePublishTaskDto } from './dto/create-publish-task.dto'
+import { CreatePublishTaskDto, BatchCreatePublishTaskDto } from './dto/create-publish-task.dto'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 
 @ApiTags('视频发布')
@@ -24,6 +24,12 @@ export class PublishController {
   @Post()
   create(@Body() dto: CreatePublishTaskDto) {
     return this.publishService.createAndPublish(dto)
+  }
+
+  @ApiOperation({ summary: '批量创建发布任务', description: '一次提交多个视频，逐项校验与发布，单项失败不影响其余项' })
+  @Post('batch')
+  createBatch(@Body() dto: BatchCreatePublishTaskDto) {
+    return this.publishService.createBatch(dto.items)
   }
 
   @ApiOperation({ summary: '发布任务列表', description: '获取所有发布任务' })

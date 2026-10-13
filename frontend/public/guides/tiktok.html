@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TikTok 海外版接入教程 · 获取令牌全流程</title>
+<title>TikTok 发布教程 · Chrome 网页发布与 API 授权</title>
 <style>
   :root { --primary:#010101; --accent:#fe2c55; --dark:#1f2937; --text:#374151; --bg:#f8fafc; --border:#e5e7eb; --blue:#2563eb; --green:#16a34a; --amber:#d97706; --code-bg:#0f172a; --code-fg:#e2e8f0; }
   * { box-sizing: border-box; }
@@ -36,13 +36,27 @@
   .toc a { color:var(--blue); text-decoration:none; }
   .toc a:hover { text-decoration:underline; }
   footer { text-align:center; color:#9ca3af; font-size:13px; padding:24px; }
+
+  .step-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 18px; }
+  .step-links a { display: inline-block; padding: 7px 12px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; color: #1d4ed8; text-decoration: none; font-size: 14px; }
+  .step-links a:hover { background: #dbeafe; text-decoration: underline; }
+  .step-links span { flex-basis: 100%; color: #64748b; font-size: 13px; }
+  .browser-guide { padding:24px; }
+  .browser-guide h2 { margin-top:12px; }
+  .browser-guide figure { margin:20px 0; }
+  .browser-guide img { display:block; width:100%; height:auto; border:1px solid var(--border); border-radius:8px; }
+  .browser-guide figcaption { color:#64748b; font-size:13px; margin-top:8px; }
+  .browser-guide details { background:#f8fafc; padding:14px; border-radius:8px; }
+  .browser-guide summary { cursor:pointer; font-weight:600; }
+  .eyebrow { color:#be123c; font-size:14px; font-weight:600; }
+  @media(max-width:600px) { .container { padding:20px 12px; } .browser-guide { padding:16px; } th,td { padding:6px; overflow-wrap:anywhere; } }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>TikTok 海外版接入教程</h1>
-  <p>从零申请应用 → 拿 Client Key / Secret → 授权拿到令牌（仅窄屏，强制 PKCE）</p>
+  <h1>TikTok 发布与接入教程</h1>
+  <p>先看已验证的 Chrome 网页发布，再按需配置官方 API 授权</p>
 </header>
 
 <div class="container">
@@ -50,7 +64,8 @@
   <div class="toc">
     <h3 style="margin-top:0">📑 目录</h3>
     <ol>
-      <li><a href="#intro">平台介绍</a></li>
+      <li><a href="#browser-publish"><strong>Chrome 网页发布图文教程（已实测成功）</strong></a></li>
+      <li><a href="#intro">官方 API 平台介绍与历史记录</a></li>
       <li><a href="#prepare">第 0 步：翻墙准备</a></li>
       <li><a href="#account">第 1 步：注册开发者账号 &amp; 创建应用</a></li>
       <li><a href="#product">第 2 步：添加 Content Posting API 产品</a></li>
@@ -63,19 +78,60 @@
     </ol>
   </div>
 
-  <h2 id="intro">一、平台介绍</h2>
-  <p>TikTok（抖音海外版）只支持<strong>窄屏（竖屏）</strong>，用的是 <strong>TikTok Content Posting API</strong>，并且<strong>强制使用 PKCE</strong>（无需 client_secret 也能安全授权，本系统已自动处理）。</p>
+
+<section id="browser-publish" class="card browser-guide">
+  <p class="eyebrow">2026-10-12 · Chrome 网页发布实测</p>
+  <h2>不用切换私密账号：在已登录的 Chrome 中发布</h2>
+  <p><strong>本次已成功：</strong>使用原本已登录的 Chrome，将 <code>a (14).mp4</code> 发布到 <code>@andjacktom1</code>，作品列表显示“所有人”。<a href="https://www.tiktok.com/@andjacktom1/video/7695626809517346069" target="_blank" rel="noopener noreferrer">查看本次视频 ↗</a></p>
+  <div class="tip"><strong>当前项目已统一为官方网页发布。</strong>打开“TikTok 网页发布”，准备文案，再点击“打开 TikTok 官方上传页”。链接在当前浏览器的新标签页打开，沿用该浏览器登录状态，不再弹出独立 Chrome。请用已登录 TikTok 的 Chrome 打开项目。</div>
+  <table><tr><th>项目功能</th><th>实际作用</th></tr><tr><td>保存账号、复制文案</td><td>账号长期保存在本机项目。最近选中的账号、未完成的文案和视频链接自动保存在当前浏览器，刷新或重新打开后恢复；各账号草稿独立保存。清除浏览器网站数据会清除这些草稿。不会登录或自动切换 TikTok 账号。</td></tr><tr><td>打开 TikTok 官方上传页</td><td>在 TikTok 选择文件、粘贴文案、核对可见范围并点击发布。</td></tr><tr><td>保存发布记录</td><td>发布后粘贴所属账号的完整视频链接，标记“用户确认已发布”；不自动验证公开状态。</td></tr><tr><td>普通视频发布和 API 重试</td><td>已停用 TikTok 发布，其他平台不受影响。TikTok 授权仍可用于读取视频。</td></tr></table>
+
+  <h3 id="browser-step-1">1. 选对窗口，核对账号</h3>
+  <p>在你平时使用、已经登录 TikTok 的 Chrome 中打开本人主页，核对用户名，并确认出现“编辑主页”按钮。本次用户名是 <code>andjacktom1</code>，显示昵称是“帅无罪”。仅打开某个用户的主页，不等于已登录该账号。</p>
+  <div class="step-links"><a href="https://www.tiktok.com/@andjacktom1" target="_blank" rel="noopener noreferrer">本次发布账号主页 ↗</a><a href="http://localhost:5173/#/tiktok-browser-publish" target="_blank" rel="noopener noreferrer">项目浏览器发布入口 ↗</a></div>
+  <figure><a href="images/tiktok-authorization/27-web-only-entry.jpg" target="_blank"><img src="images/tiktok-authorization/27-web-only-entry.jpg" alt="当前项目 TikTok 网页发布入口：准备文案、打开官方网页、保存发布链接" loading="lazy"></a><figcaption>新版项目入口真实截图。先选择目标账号和准备文案，再到官方网页上传。选择账号不会自动登录。</figcaption></figure>
+
+
+  <h3 id="browser-step-2">2. 助手操作时，先检查连接和文件权限</h3>
+  <p>手动上传无需 ChatGPT 扩展。让助手代传时，需要连接你正在使用的 Chrome，并允许扩展访问本地文件网址。打开 <code>chrome://extensions</code> → ChatGPT 扩展 → 详细信息 → 开启“允许访问文件网址”。这是浏览器内部地址，请复制到地址栏打开。</p>
+  <div class="step-links"><a href="https://developers.openai.com/codex/app/chrome-extension#upload-files" target="_blank" rel="noopener noreferrer">扩展文件上传说明 ↗</a></div>
+  <p>本次扩展曾连接失败；用户更换代理地址后，实际恢复了标签页读取。恢复连接不代表上传成功，仍需完成下方操作。侧栏出现“此对话已在另一个应用中打开”也不能用来判断浏览器控制是否已连接。</p>
+
+  <h3 id="browser-step-3">3. 打开 TikTok Studio，选择视频</h3>
+  <div class="step-links"><a href="https://www.tiktok.com/tiktokstudio/upload?from=webapp&amp;tab=video" target="_blank" rel="noopener noreferrer">打开 TikTok 视频上传页 ↗</a></div>
+  <p>点击“选择视频”，选择电脑上的文件。本次使用 <code>E:\山立重工\a (14).mp4</code>，720 × 1280，约 6 秒、1.16 MB。若有新功能介绍弹窗，点击“知道了”。等待页面显示“已上传”，不要把选中文件或上传百分比当成发布成功。</p>
+  <figure><a href="images/tiktok-authorization/25-browser-upload-entry.jpg" target="_blank"><img src="images/tiktok-authorization/25-browser-upload-entry.jpg" alt="TikTok Studio 视频上传入口，点击选择视频" loading="lazy"></a><figcaption>真实上传入口截图；为补充教程重新打开空白上传页，没有重复上传或发布视频。</figcaption></figure>
+
+  <h3 id="browser-step-4">4. 填写描述，核对可见范围，再发布</h3>
+  <ol><li>填写“视频描述”；本次沿用文件名 <code>a (14)</code>，正式发布时建议换成清楚的视频标题和介绍。</li>
+  <li>核对视频预览、封面和账号。“何时发布”本次选“现在”，“谁可以看”本次为“所有人”。以后每次按自己的意愿核对，不自动沿用本次选择。</li>
+  <li>展开“显示更多”，检查评论、复用内容、品牌/商品推广披露、AI 内容和观众管理。按实际内容填写。</li>
+  <li>等待检查。本次音乐版权检查、内容快速检查均显示“未发现问题”，然后点击“发布”。检查通过不保证以后不会被平台复审。</li></ol>
+  <p>“保存草稿”不会正式发布。如果提交后结果不明确，先查看作品列表，避免反复点击发布造成重复内容。</p>
+
+  <h3 id="browser-step-5">5. 到作品列表确认成功</h3>
+  <p>发布后进入 TikTok Studio 左侧“作品”。本次列表第一条显示 <code>a (14)</code>、<strong>10月12日 12:02</strong>、隐私为<strong>所有人</strong>，并生成了下方视频链接。这才是本次成功依据。</p>
+  <div class="step-links"><a href="https://www.tiktok.com/@andjacktom1/video/7695626809517346069" target="_blank" rel="noopener noreferrer">查看已发布的视频 ↗</a><a href="http://localhost:5173/#/publish-records" target="_blank" rel="noopener noreferrer">查看项目发布记录 ↗</a></div>
+  <figure><a href="images/tiktok-authorization/26-browser-published.jpg" target="_blank"><img src="images/tiktok-authorization/26-browser-published.jpg" alt="发布成功：TikTok Studio 作品列表首条 a (14)，可见范围所有人" loading="lazy"></a><figcaption>实际成功结果截图：首条 a (14)，时间 10月12日 12:02，可见范围“所有人”。点击图片可放大。</figcaption></figure>
+  <div class="tip"><strong>为什么项目仍显示失败？</strong>项目中的 a (14) 旧记录是之前官方 API 的失败记录。这次通过 Chrome 直接发布，旧 API 记录不会自动变成成功。现在可回到项目“TikTok 网页发布”，选择对应账号、填写视频标题和完整视频链接，勾选已核对后点击“保存发布记录”。相同链接不会重复保存，登记结果明确标为“用户确认已发布”。旧 API 记录保留原样；不要为同步状态重复发布视频。</div>
+  <p><a href="#intro">继续查看官方 API 授权教程与历史故障记录 ↓</a></p>
+</section>
+
+  <h2 id="intro">一、官方 API 授权与历史记录</h2>
+  <div class="warn">以下发布、可见性与重试内容为历史排障记录。当前已停用 TikTok API 发布及重试；授权仅保留供视频读取使用，所有新视频请走上方网页发布入口。</div>
+  <p>以下为官方 API 接入说明与历史测试记录；2026-10-12 的 Chrome 网页发布成功步骤见上文。本项目官方 API 发布入口按竖屏视频配置，使用 <strong>TikTok Content Posting API</strong>。本地授权使用 <strong>Desktop Login Kit</strong>：需要 Client Key、Client Secret 和 PKCE；PKCE 校验码由系统自动生成。</p>
 
   <h2 id="prepare">二、第 0 步：翻墙准备</h2>
   <div class="danger">
     TikTok 是海外平台，<strong>浏览器和后端都需要能访问</strong>。授权、发布都要后端调 TikTok 接口，如果后端连不上会报 <code>授权失败：fetch failed</code>。
   </div>
-  <p>把翻墙软件切到「<strong>全局 / TUN 模式</strong>」，让所有程序（包括 Node 后端）都走代理，不要用「系统代理 / PAC」模式。</p>
+  <p>分别检查浏览器与本项目后端的网络连接。可使用已配置的项目级代理；不必为了本教程统一切换系统代理或 TUN 模式。浏览器能访问不代表后端能访问。</p>
 
   <h2 id="account">三、第 1 步：注册开发者账号 &amp; 创建应用</h2>
+  <div class="step-links"><a href="https://developers.tiktok.com" target="_blank" rel="noopener noreferrer">TikTok 开发者平台 ↗</a></div>
   <ol>
-    <li>打开 <a href="https://developers.tiktok.com" target="_blank">TikTok for Developers</a>，登录（通常需要海外账号）。</li>
-    <li>进入 <strong>My Apps</strong>，创建应用。</li>
+    <li>打开 <a href="https://developers.tiktok.com" target="_blank">TikTok for Developers</a>，使用独立的开发者账号登录。尚未注册时，打开 <a href="https://developers.tiktok.com/signup" target="_blank" rel="noopener noreferrer">开发者注册页</a>，使用可收邮件的邮箱验证并设置密码；普通 TikTok 网页已登录不代表开发者平台已登录。</li>
+    <li>点击 <strong>Developer Portal → Manage apps → Connect an app</strong>，选择 Individual，创建应用。本项目应用名称为 ShanBo Video Publisher；本地测试选择 Sandbox，并创建 Local Development 沙盒。</li>
     <li>应用创建后，在应用详情页能看到：
       <ul>
         <li><strong>Client Key</strong> → 对应系统的 <code>appId</code></li>
@@ -85,17 +141,47 @@
   </ol>
 
   <h2 id="product">四、第 2 步：添加 Content Posting API 产品</h2>
+  <div class="step-links"><a href="https://developers.tiktok.com" target="_blank" rel="noopener noreferrer">TikTok 开发者平台 ↗</a><span>打开后选择自己的应用，再按下方步骤操作。</span></div>
   <ol>
     <li>在应用详情里找到 <strong>「Content Posting API」</strong>，点 <strong>Add product / 添加</strong>（对应 <code>video.publish</code>，用于发布）。</li>
-    <li>若要使用左侧「<strong>TikTok 视频</strong>」栏目拉取已发布视频，还需额外添加 <strong>「Video List」</strong> 产品并申请 <code>video.list</code> 权限；仅发布则不需要。</li>
+    <li>若要使用左侧「<strong>TikTok 视频</strong>」栏目拉取已发布视频，还需在 <strong>Add scopes</strong> 中添加 <code>video.list</code> 权限（公开视频读取能力）；仅发布则不需要。</li>
     <li>有些账号需要先完成企业验证或提交审核才能启用。</li>
   </ol>
 
   <h2 id="callback">五、第 3 步：配置回调地址</h2>
-  <p>在应用的 <strong>Login Kit / Redirect URI</strong> 配置中填写：</p>
+  <div class="step-links"><a href="https://developers.tiktok.com" target="_blank" rel="noopener noreferrer">TikTok 开发者平台 ↗</a><span>打开后选择自己的应用，再按下方步骤操作。</span></div>
+  <p>在应用的 <strong>Login Kit</strong> 中选择 <strong>Desktop</strong> 平台，并登记下面的本地回调地址。Web 平台要求 HTTPS，不能直接照填此 HTTP 地址。<a href="https://developers.tiktok.com/docs/en/login-kit-desktop" target="_blank" rel="noopener noreferrer">查看 Desktop 官方说明</a>：</p>
   <pre><code>http://localhost:5001/platform/tiktok/oauth/callback</code></pre>
 
+  <div class="card">
+    <h3 style="margin-top:0">本项目沙盒配置记录（2026-10-09）</h3>
+    <p><a href="https://developers.tiktok.com/app/7694477039620999188/sandbox/7694444996972922901" target="_blank" rel="noopener noreferrer">打开 Local Development 沙盒 ↗</a></p>
+    <p>应用和沙盒已创建；图标由管理员上传后，已点击 Apply changes 保存。Desktop、Login Kit、Content Posting API、Direct Post 和 video.list 已配置，本地 Desktop 回调已核对。<strong>测试账号 andjacktom1 已连接，项目 OAuth 已成功回调并保存令牌。未执行视频发布。</strong></p>
+    <p>已在项目中制作本地应用首页、使用条款、隐私说明和 1024 × 1024 PNG 图标。未部署公网网站。以下本地地址已随图标一同保存至沙盒；这不等于正式应用审核通过，也不表示其他人的电脑能够访问这些页面。</p>
+    <ul>
+      <li>Web/Desktop URL：<a href="http://localhost:5173/tiktok-app/index.html" target="_blank" rel="noopener noreferrer">http://localhost:5173/tiktok-app/index.html</a>（Vite 开发环境请保留 index.html）</li>
+      <li>Terms of Service URL：<a href="http://localhost:5173/tiktok-app/terms.html" target="_blank" rel="noopener noreferrer">http://localhost:5173/tiktok-app/terms.html</a></li>
+      <li>Privacy Policy URL：<a href="http://localhost:5173/tiktok-app/privacy.html" target="_blank" rel="noopener noreferrer">http://localhost:5173/tiktok-app/privacy.html</a></li>
+      <li>应用图标：<a href="http://localhost:5173/tiktok-app/app-icon.png" target="_blank" rel="noopener noreferrer">查看本地图标</a>；文件位于 <code>frontend/public/tiktok-app/app-icon.png</code>。</li>
+    </ul>
+    <h4>实际操作顺序</h4>
+    <ol>
+      <li>在 App icon 下选择本地图标。若浏览器自动上传提示缺少文件网址访问权限，可由管理员手动选择文件。本次管理员另选了挖掘机图片，已上传成功；下方截图以实际上传结果为准。</li>
+      <li>点击 Apply changes。保存后“unsaved changes”提示消失。<img src="images/tiktok-authorization/07-sandbox-saved.png" alt="应用图标已上传，沙盒配置已保存" style="width:100%;border:1px solid #e5e7eb;border-radius:8px" loading="lazy"></li>
+      <li>在 Login Kit 切换到 Desktop 核对回调。保存后界面可能默认选 Web，不代表 Desktop 回调丢失。<img src="images/tiktok-authorization/08-desktop-callback-saved.png" alt="已保存的 Desktop 本地授权回调" style="width:100%;border:1px solid #e5e7eb;border-radius:8px" loading="lazy"></li>
+      <li>进入 Target users，点 Add account，再点弹窗中的 Continue。<img src="images/tiktok-authorization/09-connect-test-account.png" alt="连接 TikTok 测试账号的确认入口" style="width:100%;border:1px solid #e5e7eb;border-radius:8px" loading="lazy"></li>
+      <li>在新开的 TikTok 登录页登录实际要发布的账号。开发者账号和 TikTok 内容账号是两个步骤，浏览器原先登录也可能被要求重新登录。完成平台显示的账号连接流程后，确认 Target users 中出现目标账号，再在本项目发起 OAuth 授权。</li>
+    </ol>
+    <p>当前测试账号已出现在 Target users 中。本地填写沙盒 Client Key / Client Secret 后完成 OAuth，页面显示授权成功、令牌已保存。读取视频接口已补齐 fields 参数并修正首次请求的 cursor，复测已成功显示真实视频、封面、时长和统计信息。多账号相关 30 项测试、前后端构建及前端类型检查通过。授权配置已重新备份；尚未执行或验证真实视频发布。</p>
+    <h4>账号连接与授权结果</h4><p>使用与目标 TikTok 账号一致的登录会话完成连接。浏览器后台管理会话过期时，保存可能提示 Unauthorized；应重新登录本地后台，不要把该提示误认为 TikTok 密钥错误。</p>
+    <img src="images/tiktok-authorization/10-sandbox-test-user-consent.png" alt="确认当前 TikTok 账号成为沙盒测试用户" style="width:100%;border-radius:8px" loading="lazy">
+    <img src="images/tiktok-authorization/11-test-user-connected.png" alt="沙盒 Target users 中已出现目标账号" style="width:100%;border-radius:8px" loading="lazy">
+    <img src="images/tiktok-authorization/13-oauth-success.png" alt="本地项目显示 TikTok 授权成功并保存令牌" style="width:100%;border-radius:8px" loading="lazy">
+    <h4>视频读取验证</h4><p><a href="http://localhost:5173/#/tiktok-videos" target="_blank" rel="noopener noreferrer">打开本地 TikTok 视频页</a>，点击“获取视频”。该接口读取授权账号的公开视频。<a href="https://developers.tiktok.com/docs/en/tiktok-api-v2-video-list" target="_blank" rel="noopener noreferrer">官方视频列表接口说明</a>。</p><img src="images/tiktok-authorization/14-videos-loaded.png" alt="实际读取 TikTok 公开视频成功" style="width:100%;border-radius:8px" loading="lazy">
+    <details><summary>历史故障：图标缺失导致不能保存</summary><p>此前本地网址校验通过但图标未上传，表单提示 App icon is required。上传图标后此错误已解决。</p><img src="images/tiktok-authorization/04-local-url-validation.png" alt="历史截图：缺少图标时的表单校验错误" style="width:100%;border:1px solid #e5e7eb;border-radius:8px" loading="lazy"></details>
+  </div>
   <h2 id="fill">六、第 4 步：填进系统「平台配置」页</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <ol>
     <li>打开系统「平台配置」页，找到「<strong>TikTok 海外版</strong>」，点「<strong>配置</strong>」。</li>
     <li>填两项，其它留空：
@@ -107,26 +193,48 @@
     <li>点「<strong>保存</strong>」。</li>
   </ol>
 
-  <h2 id="auth">七、第 5 步：点「授权」完成授权</h2>
+  <h2 id="auth">七、第 5 步：添加 TikTok 账号并授权</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <ol>
-    <li>TikTok 那一行点「<strong>授权</strong>」，跳转 TikTok 授权页，授权 <code>video.publish</code>。</li>
+    <li>在「TikTok 多账号管理」点「<strong>添加 TikTok 账号</strong>」，在 TikTok 页面核对目标账号并同意 <code>user.info.basic</code>、<code>video.publish</code>、<code>video.list</code> 权限。</li>
     <li>系统会自动处理 PKCE（<code>code_challenge</code> / <code>code_verifier</code>），你无需手动操作。</li>
-    <li>授权成功自动回填 <code>accessToken</code> + <code>refreshToken</code> + <code>openId</code>。</li>
+    <li>授权成功按应用和账号身份分别保存令牌，不覆盖其他账号；重复添加同一账号会更新该账号的授权。</li>
   </ol>
 
   <h2 id="success">八、成功标志</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a> <a href="/#/publish" target="_blank" rel="noopener noreferrer">打开视频发布 ↗</a></div>
   <div class="card">
     <ul style="margin:0">
       <li>页面弹出：<strong>「TikTok 海外版 授权成功，令牌已保存」</strong></li>
-      <li>表格里「TikTok 海外版」变成 <strong>「已配置凭证」</strong></li>
+      <li>下方「TikTok 多账号管理」出现目标账号并显示 <strong>「已绑定账号」</strong>；表格里的「应用已配置」只表示应用密钥已填写</li>
     </ul>
   </div>
 
+
+  <h2 id="multi-account">多账号管理、查看视频与选择发布目标</h2>
+  <div class="step-links"><a href="http://localhost:5173/#/platform-config" target="_blank" rel="noopener noreferrer">打开账号管理 ↗</a> <a href="https://developers.tiktok.com/app/7694477039620999188/sandbox/7694444996972922901" target="_blank" rel="noopener noreferrer">打开当前应用沙盒 / Target Users ↗</a></div>
+  <ol>
+    <li>同一个开发者应用可以连接多个 TikTok 账号，无需为每个账号重新创建应用。沙盒环境先把目标账号加入 Target Users。</li>
+    <li>在 TikTok 登录目标账号，返回项目点击「添加 TikTok 账号」。核对授权页账号后完成授权；已有账号的「重新授权」只接受原账号，选错会拒绝保存。</li>
+    <li>原来的单账号授权会自动保留到多账号列表。点击「识别资料」读取昵称；若提示缺少基本资料权限，重新授权同意该权限即可。可设置备注或停用账号。</li>
+    <li>到 <a href="http://localhost:5173/#/tiktok-videos" target="_blank" rel="noopener noreferrer">TikTok 视频页</a>选择账号，再获取视频；切换账号时清空旧结果，卡片桌面端一行 8 列。</li>
+    <li>到 <a href="http://localhost:5173/#/publish" target="_blank" rel="noopener noreferrer">视频发布页</a>选择 TikTok 平台后，必须选择目标账号。单个和批量任务都绑定该账号，重试继续使用原账号。</li>
+    <li>添加或更新授权后点击「备份到根目录」。版本 3 的 <code>local-config.private.json</code> 包含所有 TikTok / YouTube 账号，导入按身份合并，保留已有账号 ID。文件及恢复备份均已排除 Git。</li>
+  </ol>
+  <p>历史授权实测（不包含上方 Chrome 网页发布）：原 TikTok 授权迁移成功，已识别昵称并读取真实视频；多账号隔离、错号拒绝、重试绑定、刷新轮换和备份合并已通过自动化测试。当前实际连接 1 个 TikTok 账号；第二个账号需由目标账号完成授权。尚未实际上传或发布视频，平台沙盒及发布审核限制仍适用。</p>
+  <p><a href="https://developers.tiktok.com/docs/en/tiktok-api-v2-get-user-info" target="_blank" rel="noopener noreferrer">官方账号资料与权限说明</a> · <a href="https://developers.tiktok.com/docs/en/oauth-user-access-token-management" target="_blank" rel="noopener noreferrer">官方令牌刷新说明</a></p>
+  <img src="images/tiktok-authorization/16-multi-account-management.png" alt="本地 TikTok 多账号管理与迁移账号" style="width:100%;border-radius:8px" loading="lazy">
+  <img src="images/tiktok-authorization/19-eight-column-videos.png" alt="按账号查看真实 TikTok 视频" style="width:100%;border-radius:8px" loading="lazy">
+  <img src="images/tiktok-authorization/18-publish-account-selection.png" alt="发布前必须选择 TikTok 目标账号" style="width:100%;border-radius:8px" loading="lazy">
+
   <h2 id="errors">九、易错点汇总</h2>
+  <div class="step-links"><a href="https://developers.tiktok.com" target="_blank" rel="noopener noreferrer">TikTok 开发者平台 ↗</a> <a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <table>
     <tr><th style="width:26%">坑</th><th>现象 / 原因</th><th style="width:42%">解决办法</th></tr>
-    <tr><td><strong>fetch failed</strong></td><td>后端连不上 TikTok</td><td>翻墙切「全局 / TUN 模式」</td></tr>
-    <tr><td><strong>token 过期</strong></td><td>发布时提示过期</td><td>access_token 约 24 小时，先点「刷新令牌」</td></tr>
+    <tr><td><strong>fetch failed</strong></td><td>后端连不上 TikTok</td><td>检查本项目后端的代理配置及连接；浏览器能访问不代表后端可访问</td></tr>
+    <tr><td><strong>应用未审核，直发被拒绝</strong></td><td><code>unaudited_client_can_only_post_to_private_accounts</code></td><td>2026-10-09 实测：重试 PV390H 视频仍在初始化阶段被拒绝，未上传到 TikTok；YouTube 已成功且未重复发布。同日 16:39 新建 a (14).mp4 发布任务（1.2 MB、720 × 1280、约 6 秒），只选择 TikTok 账号，仍收到同一审核限制错误。更换视频不能解除应用审核限制。根据 <a href="https://developers.tiktok.com/docs/en/content-sharing-guidelines" target="_blank" rel="noopener">官方发布规则</a>，未审核应用要求发布账号为私密账号、视频可见性为 SELF_ONLY（仅自己可见）。已增加发布前账号检查和可见性选择；旧任务需在重试弹窗中重新选择可见性。账号整体隐私变更须由用户决定，不能自动切换。公开自动直发需完成平台审核；也可使用 TikTok 官方界面手动发布。反复重试不会解除审核限制。</td></tr>
+    <tr><td><strong>分片数量不正确</strong></td><td><code>The total chunk count is invalid</code></td><td>已修正上传分片算法：不超过 64 MB 的视频整段上传，更大视频把尾部不足一片的字节并入最后一片，片数向下取整。上传时校验 HTTP 状态，全部接收后才显示已上传。参见 <a href="https://developers.tiktok.com/docs/en/content-posting-api-media-transfer-guide" target="_blank" rel="noopener">TikTok 官方分片规则</a>。修复后可在 <a href="http://localhost:5173/#/publish-records" target="_blank">发布记录</a> 重试失败的平台；已经成功的平台不重复发布。</td></tr>
+    <tr><td><strong>token 过期</strong></td><td>发布时提示过期</td><td>系统按账号刷新并保存新令牌；失败时对该账号点击「重新授权」</td></tr>
     <tr><td><strong>产品没添加</strong></td><td>授权时没有发布权限</td><td>先 Add product：Content Posting API</td></tr>
     <tr><td><strong>上传地址失效</strong></td><td>上传超时</td><td>上传地址 1 小时有效，及时上传</td></tr>
   </table>
@@ -142,7 +250,34 @@
 
 </div>
 
-<footer>TikTok 海外版接入教程 · 更新于 2026-08-17</footer>
+<footer>TikTok 海外版接入教程 · 更新于 2026-10-12</footer>
 
+<section id="privacy-publish" style="max-width:1100px;margin:32px auto;padding:24px;background:#fff;border:1px solid #dce4ee;border-radius:12px">
+<h2>历史记录：API 可见性选择与失败重试（当前已停用）</h2>
+<p>2026-10-09 已上线本地功能；界面和模拟接口测试通过，不代表应用已通过 TikTok 审核，也不代表新视频已成功发布。</p>
+<ol>
+<li>打开 <a href="http://localhost:5173/#/publish" target="_blank">视频发布</a>，选择视频和 TikTok 目标账号。页面会实时读取该账号昵称、可见性选项及最长视频时长。</li>
+<li>在“TikTok 视频可见性”中主动选择平台允许的选项，默认不选。未审核应用测试应选“仅自己可见”，且账号须已设为私密；此功能不会修改账号整体隐私，也不会代替应用审核。页面根据平台选项提示账号为公开还是私密；这不等于应用审核状态。</li>
+<li>检查失败、未选择可见性或视频超长时不可提交。切换账号会清空之前的可见性；批量视频使用同一目标账号及可见性。当前直发关闭评论、合拍和拼接。</li>
+<li>旧失败任务打开 <a href="http://localhost:5173/#/publish-records" target="_blank">发布记录</a> → 重试，检查绑定账号并选择可见性，确认后才会重新提交。已成功的平台不重复发布；已获得 TikTok 发布 ID 的失败记录先核对平台状态，避免重复上传。</li>
+<li>发布记录显示实际使用的可见性。看到“本地上传完成”仅表示文件在本地，最终结果以平台发布记录为准。</li>
+</ol>
+<p><a href="https://developers.tiktok.com/docs/en/content-posting-api-reference-query-creator-info" target="_blank" rel="noopener">官方账号发布设置接口</a> · <a href="https://developers.tiktok.com/docs/en/content-sharing-guidelines" target="_blank" rel="noopener">官方审核与私密测试规则</a></p>
+<figure><img src="images/tiktok-authorization/20-privacy-retry-settings.png" alt="真实重试设置界面：账号检查、仅自己可见和审核限制提示，尚未提交" style="max-width:100%"><figcaption>真实界面截图，仅展示设置，不代表发布成功。</figcaption></figure>
+</section>
+<section id="upload-recovery" style="max-width:1100px;margin:32px auto;padding:24px;background:#fff;border:1px solid #dce4ee;border-radius:12px">
+<h2>历史记录：API 上传中断与状态核对（2026-10-12）</h2>
+<ol>
+<li>打开 <a href="http://localhost:5173/#/publish" target="_blank">视频发布</a>，选择文件，点击“仅上传到本地”。刷新后重选相同文件可恢复已传内容；100% 只表示本地上传完成。</li>
+<li>主动选择 TikTok 平台、目标账号和视频可见性。切换视频方向只移除不兼容的平台，不会新增发布目标；清空后也不会自动全选。时长尚未读取或超出账号限制时不能发布。</li>
+<li>如果 TikTok 已返回上传编号，系统会先保存编号再传输文件。传输中断、后端重启后仍保留编号，避免重试创建重复上传。</li>
+<li>打开 <a href="http://localhost:5173/#/publish-records" target="_blank">发布记录</a> → 视频详情。已获得编号的失败记录会显示“检查平台状态”，点击只查询原账号、原次上传，不重新发送视频。查询失败保留原记录；平台确认完成后才显示成功。</li>
+<li>轮询超时不代表平台确认失败。等待一段时间后再检查；平台仍在处理时会恢复自动查询。收件箱送达不算正式发布完成。</li>
+<li>目前断点续传适用于电脑到本地服务。TikTok 远端上传中断后的“检查平台状态”并非远端断点续传；若平台仍等待上传，先核对账号中的视频及该次状态，避免盲目重复提交。</li>
+</ol>
+<p>此前内部浏览器测试记录（早于本页上方的网页发布成功）：a (14).mp4（720 × 1280、约 6 秒）恢复本地上传成功，TikTok 账号检查正常返回，可见性未选时发布按钮禁用。本轮没有创建新发布任务或实际发送视频。当前账号仍为公开账号；先前遇到的应用审核限制不会因这些修复解除。</p>
+<p><a href="https://developers.tiktok.com/docs/en/content-posting-api-reference-get-video-status" target="_blank" rel="noopener">官方发布状态说明 ↗</a> · <a href="https://developers.tiktok.com/docs/en/content-sharing-guidelines" target="_blank" rel="noopener">官方审核与发布规则 ↗</a></p>
+<figure><img src="images/tiktok-authorization/22-local-upload-check.jpg" alt="内部浏览器实测：本地上传完成、账号检查与可见性选择" style="width:100%;border:1px solid #ddd;border-radius:8px"><figcaption>真实本地测试截图；本地上传完成不代表已发布到 TikTok。</figcaption></figure><figure><img src="images/tiktok-authorization/23-retry-requires-privacy.jpg" alt="重试设置要求主动选择可见性" style="width:100%;border:1px solid #ddd;border-radius:8px"><figcaption>旧任务重试：可见性尚未选择，确认重试按钮禁用。</figcaption></figure>
+</section>
 </body>
 </html>

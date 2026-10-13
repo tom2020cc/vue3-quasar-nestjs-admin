@@ -21,6 +21,9 @@ backend/uploads/
 
 # ---- 本地密钥 / 敏感文件（严禁提交）----
 github_token.txt
+local-config*.json
+local-config*.tmp
+.private-config/
 新建文本文档.txt
 
 # ---- 备份压缩包 ----
@@ -47,3 +50,17 @@ lerna-debug.log*
 # ---- 测试覆盖率 ----
 coverage/
 .nyc_output/
+
+# 私有上传会话与断点
+backend/.upload-sessions/
+backend/.browser-publish/
+
+# 本机操作原图及含账号/授权地址的截图，仅在本地保留
+/docs/
+/frontend/public/guides/images/youtube-multi-account/03-add-test-user.jpg
+/frontend/public/guides/images/youtube-multi-account/04-test-users-saved.jpg
+/frontend/public/guides/images/youtube-multi-account/05-choose-other-account.jpg
+/frontend/public/guides/images/youtube-multi-account/06-google-test-warning.png
+/frontend/public/guides/images/youtube-multi-account/07-google-consent.png
+/frontend/public/guides/images/youtube-setup/10-proxy-working-settings.png
+/frontend/public/guides/images/youtube-video-details/03-youtube-video-detail.jpg

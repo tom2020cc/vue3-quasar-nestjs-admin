@@ -29,8 +29,8 @@
 ② 创建「应用」，拿到一对凭证（AppId + AppSecret，各家叫法不同）
 ③ 申请本次要用的「能力/权限/scope」
 ④ 填写「授权回调地址（Redirect URI）」
-⑤ 回到本系统 →「平台配置」→ 填 AppId/AppSecret → 点「授权」→ 浏览器跳转平台登录授权
-⑥ 授权成功后令牌自动回填 → 回「视频发布」页发视频
+⑤ 回到本系统 →[平台配置](http://localhost:5173/#/platform-config)→ 填 AppId/AppSecret → 点「授权」→ 浏览器跳转平台登录授权
+⑥ 授权成功后令牌自动回填 → 回[视频发布](http://localhost:5173/#/publish)页发视频
 ```
 
 > 回调地址（本地开发）统一为：
@@ -58,7 +58,7 @@
 
 ### 1. 注册与建应用
 
-1. 打开 **抖音开放平台**：https://developer.open-douyin.com
+1. 打开 **抖音开放平台**：[官方入口](https://developer.open-douyin.com)
 2. 注册/登录（个人或企业开发者均可，部分能力要求企业资质）。
 3. 进入「控制台 → 移动应用/网站应用」，点击**创建应用**，填写应用名称、图标、简介。
 4. 应用创建后，在「应用详情 → 凭据」页能看到：
@@ -79,7 +79,7 @@
 
 ### 4. 在本系统授权
 
-1. 打开「平台配置」页，找到「国产抖音」，点「配置」。
+1. 打开[平台配置](http://localhost:5173/#/platform-config)页，找到「国产抖音」，点「配置」。
 2. 填写：
    - `appId` ← Client Key
    - `appSecret` ← Client Secret
@@ -88,7 +88,7 @@
 
 ### 5. 发布
 
-回「视频发布」页，选宽屏或窄屏视频，勾选「国产抖音」发布即可。
+回[视频发布](http://localhost:5173/#/publish)页，选宽屏或窄屏视频，勾选「国产抖音」发布即可。
 
 **注意事项**：
 - 抖音发布**必须有 `accessToken` + `openId` 两个字段**，缺一个会走模拟模式。
@@ -99,19 +99,31 @@
 
 ## 二、油管 YouTube
 
-油管只支持**宽屏（横屏）**，用的是 **YouTube Data API v3**，走 Google 的 OAuth2。
+本项目 YouTube 支持**横屏和竖屏**，单个和批量发布均可选。使用 **YouTube Data API v3** 和 Google OAuth2；是否归类为 Shorts 由 YouTube 判断，参见[官方 Shorts 说明](https://support.google.com/youtube/answer/15424877?hl=zh-Hans)。
+
+2026-10-07 实操图文记录已加入 [网页教程](frontend/public/guides/youtube.html#walkthrough)，系统内「接入教程 → 油管 YouTube」可直接查看。截图素材位于 `frontend/public/guides/images/youtube-setup/`。
+
+本次已确认授权成功、令牌保存，并读取到 TomPlay 频道视频；没有上传或发布新视频。此前 `fetch failed` 的排查证据是后端直连 Google 超时、通过本机代理可以连通。用户提供的成功配置为：系统代理关闭、虚拟网卡开启、规则模式。这是本机的有效配置，不是所有电脑都必须采用的设置。重点是让后端也能访问 Google，而不只是浏览器能访问。
+
+若使用本机已有的 `127.0.0.1:7890` HTTP 代理，也可以在停止原后端后双击 `start-backend-proxy.bat`，单独为后端指定代理（Node.js 24+，前端仍需运行）。其他环境按实际代理地址配置；已正常连接时无需改动。后端重启后，旧授权回调中的 code / state 不可复用，需重新从系统发起授权。
 
 ### 1. 创建 Google Cloud 项目
 
-1. 打开 **Google Cloud 控制台**：https://console.cloud.google.com
+直接打开：[当前项目](https://console.cloud.google.com/welcome?project=shanbo-search-console) · [新建项目](https://console.cloud.google.com/projectcreate)。
+
+1. 打开 **Google Cloud 控制台**：[官方入口](https://console.cloud.google.com)
 2. 新建一个项目（或复用已有项目）。
 
 ### 2. 启用 YouTube Data API
+
+直接打开：[打开 YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com?project=shanbo-search-console)。
 
 1. 左侧「API 和服务 → 已启用的 API 和服务 → 启用 API 和服务」。
 2. 搜索 **YouTube Data API v3**，点击**启用**。
 
 ### 3. 创建 OAuth2 凭据（重点）
+
+直接打开：[打开 OAuth 客户端 / 回调设置](https://console.cloud.google.com/auth/clients?project=shanbo-search-console) · [创建 OAuth 客户端](https://console.cloud.google.com/auth/clients/create?project=shanbo-search-console)。
 
 1. 进入「API 和服务 → 凭据 → 创建凭据 → **OAuth 客户端 ID**」。
 2. 应用类型选择 **「Web 应用」**（本系统是服务端应用）。
@@ -123,19 +135,25 @@
 
 ### 4. OAuth 同意屏幕
 
+直接打开：[打开品牌 / 同意屏幕](https://console.cloud.google.com/auth/branding?project=shanbo-search-console) · [打开目标对象 / 测试用户](https://console.cloud.google.com/auth/audience?project=shanbo-search-console) · [打开数据访问 / 权限范围](https://console.cloud.google.com/auth/scopes?project=shanbo-search-console)。
+
 - 首次使用需配置「OAuth 同意屏幕」：选择用户类型（Internal 仅组织内 / External 任何人）。
-- 添加你授权的 Google 账号为**测试用户**（未发布应用只有测试用户能授权）。
+- 添加实际授权频道所用的 Google 账号为**测试用户**（测试模式仅允许测试用户授权）。Google Cloud 项目管理账号可以与频道账号不同。
 
 ### 5. 在本系统授权
 
-1. 打开「平台配置」页，找到「油管 YouTube」，点「配置」。
+直接打开：[本地平台配置](http://localhost:5173/#/platform-config)。
+
+1. 打开[平台配置](http://localhost:5173/#/platform-config)页，找到「油管 YouTube」，点「配置」。
 2. 填写 `appId`（客户端 ID）、`appSecret`（客户端密钥）。
 3. 保存后点「授权」，用 Google 账号登录并同意 `youtube.upload` 权限。
-4. 授权成功后，系统**只保存 `refreshToken`**（发布时再用它实时换 access_token）。
+4. 授权成功后，系统自动保存 `accessToken`、`refreshToken` 和过期时间；发布和读取频道时会使用刷新令牌换取访问令牌，无需手工填写两个 token。令牌失效或授权被撤销时需重新授权。
 
 ### 6. 发布
 
-回「视频发布」页，选**宽屏**视频，勾选「油管 YouTube」发布。
+直接打开：[视频发布](http://localhost:5173/#/publish) · [油管视频列表](http://localhost:5173/#/youtube-videos)。
+
+回[视频发布](http://localhost:5173/#/publish)页，选**宽屏**视频，勾选「油管 YouTube」发布。
 
 **注意事项**：
 - 油管必须拿到 **`refreshToken`**，因此授权地址里带了 `access_type=offline` + `prompt=consent`，这是保证能拿到刷新令牌的关键。
@@ -150,7 +168,7 @@ TikTok 只支持**窄屏（竖屏）**，用的是 **TikTok Content Posting API*
 
 ### 1. 注册与建应用
 
-1. 打开 **TikTok for Developers**：https://developers.tiktok.com
+1. 打开 **TikTok for Developers**：[官方入口](https://developers.tiktok.com)
 2. 登录（通常需要海外账号），进入 **My Apps**，创建应用。
 3. 应用创建后，在应用详情页能看到 **Client Key** 与 **Client Secret**。
 
@@ -168,14 +186,14 @@ TikTok 只支持**窄屏（竖屏）**，用的是 **TikTok Content Posting API*
 
 ### 4. 在本系统授权
 
-1. 打开「平台配置」页，找到「TikTok 海外版」，点「配置」。
+1. 打开[平台配置](http://localhost:5173/#/platform-config)页，找到「TikTok 海外版」，点「配置」。
 2. 填写 `appId`（Client Key）、`appSecret`（Client Secret）。
 3. 保存后点「授权」，跳转到 TikTok 授权页（需要科学上网访问），用 TikTok 账号授权 `video.publish`。
 4. 授权完成后自动回填 `accessToken` + `refreshToken` + `openId`。
 
 ### 5. 发布
 
-回「视频发布」页，选**窄屏**视频，勾选「TikTok 海外版」发布。
+回[视频发布](http://localhost:5173/#/publish)页，选**窄屏**视频，勾选「TikTok 海外版」发布。
 
 **注意事项**：
 - TikTok 授权走 **PKCE（S256）**，系统会自动生成 `code_challenge`/`code_verifier`，你无需手动处理。
@@ -190,7 +208,7 @@ TikTok 只支持**窄屏（竖屏）**，用的是 **TikTok Content Posting API*
 
 ### 1. 注册与建应用
 
-1. 打开 **快手开放平台**：https://open.kuaishou.com
+1. 打开 **快手开放平台**：[官方入口](https://open.kuaishou.com)
 2. 注册/登录开发者账号（通常需企业资质）。
 3. 创建应用，得到 **App ID** 与 **App Secret**。
 
@@ -206,14 +224,14 @@ TikTok 只支持**窄屏（竖屏）**，用的是 **TikTok Content Posting API*
 
 ### 4. 在本系统授权
 
-1. 打开「平台配置」页，找到「快手」，点「配置」。
+1. 打开[平台配置](http://localhost:5173/#/platform-config)页，找到「快手」，点「配置」。
 2. 填写 `appId`（App ID）、`appSecret`（App Secret）。
 3. 保存后点「授权」，用快手账号授权 `user_video_publish`。
 4. 授权完成后自动回填 `accessToken` + `refreshToken` + `openId`。
 
 ### 5. 发布
 
-回「视频发布」页，选**窄屏**视频，勾选「快手」发布。
+回[视频发布](http://localhost:5173/#/publish)页，选**窄屏**视频，勾选「快手」发布。
 
 **注意事项**：
 - 快手发布是**异步**的，作品转码约 1 分钟后生效；系统会**尽力轮询视频列表**确认最终状态（接口字段随应用类型略有差异，失败时靠轮询超时兜底）。
@@ -227,7 +245,7 @@ Facebook 支持**宽屏和窄屏**，用的是 **Meta Graph API**，把视频发
 
 ### 1. 注册 Meta 开发者 & 创建 App
 
-1. 打开 **Meta for Developers**：https://developers.facebook.com ，用你的 Facebook 账号登录。
+1. 打开 **Meta for Developers**：[官方入口](https://developers.facebook.com) ，用你的 Facebook 账号登录。
 2. 「我的应用 → 创建应用」，应用类型选 **Business（商务）**。
 3. 创建后在「应用设置 → 基本信息」拿到：
    - **App ID**（对应系统 `appId`）
@@ -256,13 +274,13 @@ http://localhost:5001/platform/facebook/oauth/callback
 
 ### 5. 在本系统授权
 
-1. 打开「平台配置」页，找到「Facebook」，点「配置」，填 `appId`（App ID）、`appSecret`（App Secret），保存。
+1. 打开[平台配置](http://localhost:5173/#/platform-config)页，找到「Facebook」，点「配置」，填 `appId`（App ID）、`appSecret`（App Secret），保存。
 2. 点「授权」，跳转 Meta 授权页，选择你的 Page 并同意。
 3. 授权成功后自动回填：系统用授权码换 **60 天长期 token**，再拉 `me/accounts` 拿到 **Page Token + pageId**，全部写入配置。
 
 ### 6. 发布
 
-回「视频发布」页，选宽屏或窄屏视频，勾选「Facebook」发布。发布走**可断点续传上传**（start → 分片 transfer → finish），完成后轮询 `status.video_status` 直到 `ready`。
+回[视频发布](http://localhost:5173/#/publish)页，选宽屏或窄屏视频，勾选「Facebook」发布。发布走**可断点续传上传**（start → 分片 transfer → finish），完成后轮询 `status.video_status` 直到 `ready`。
 
 **注意事项**：
 - 发布**必须用 Page Access Token**，用户 token 会报 `#100 No permission`——本系统已自动完成「用户 token → 页面 token」的转换，你无需手动处理。
@@ -320,13 +338,13 @@ IG 发布时系统会先把视频上传到对象存储、生成公网 URL 再交
 
 ### 6. 在本系统授权
 
-1. 打开「平台配置」页，找到「Instagram」，填 `appId` / `appSecret`，保存。
+1. 打开[平台配置](http://localhost:5173/#/platform-config)页，找到「Instagram」，填 `appId` / `appSecret`，保存。
 2. 点「授权」，跳转 Meta 授权页，选择你的 **IG 专业账号**和关联 Page，同意授权。
 3. 授权成功后自动回填：系统通过 Page 反查 `instagram_business_account.id` 得到 **igUserId**，连同 60 天 token 一并写入配置。
 
 ### 7. 发布
 
-回「视频发布」页，选**窄屏**视频，勾选「Instagram」发布。系统会先上传对象存储 → 创建 IG 容器 → 轮询 `status_code` → `FINISHED` 后 `media_publish`。
+回[视频发布](http://localhost:5173/#/publish)页，选**窄屏**视频，勾选「Instagram」发布。系统会先上传对象存储 → 创建 IG 容器 → 轮询 `status_code` → `FINISHED` 后 `media_publish`。
 
 **注意事项**：
 - **必须专业账号 + 绑定 Page + 对象存储公网 URL**，三者缺一不可。
@@ -370,13 +388,13 @@ IG 发布时系统会先把视频上传到对象存储、生成公网 URL 再交
 → 各平台控制台填的回调地址必须与 `backend/.env` 的 `BACKEND_BASE_URL` 拼出的地址**完全一致**（油管/TikTok 校验完整路径，抖音/快手通常只校验域名）。
 
 **2. 授权成功但发布仍走「模拟模式」？**
-→ 检查该平台是否**缺关键凭证**：抖音要 `accessToken+openId`、油管要 `refreshToken`、TikTok/快手要 `accessToken`、Facebook 要 `accessToken + pageId`、Instagram 要 `accessToken + igUserId`。缺少即触发模拟发布。
+→ YouTube 已改为多账号管理，必须添加或识别频道并在发布页选择，未选择不能提交。其他平台检查是否缺关键凭证：抖音要 `accessToken+openId`、TikTok/快手要 `accessToken`、Facebook 要 `accessToken + pageId`、Instagram 要 `accessToken + igUserId`。多账号步骤与截图见 [YouTube 多账号指南](YOUTUBE_MULTI_ACCOUNT.md)。
 
 **3. 油管授权后没有 `refreshToken`？**
 → 确认授权地址带 `access_type=offline`（本系统已带）。若之前授权过，Google 可能不再重复下发，需要到 Google 账号的「第三方应用权限」里移除授权后重新授权。
 
 **4. 抖音 `access_token` 过期了？**
-→ 用「平台配置」页的「刷新令牌」按钮，或重新「授权」。
+→ 用[平台配置](http://localhost:5173/#/platform-config)页的「刷新令牌」按钮，或重新「授权」。
 
 **5. 记录一直停在「处理中」？**
 → 说明轮询仍在进行；若超过 `POLL_MAX_ATTEMPTS` 次仍未完成会标记失败。可看后端日志或记录 message 了解平台返回的状态。
@@ -385,7 +403,7 @@ IG 发布时系统会先把视频上传到对象存储、生成公网 URL 再交
 → 油管/TikTok 允许 localhost；抖音/快手也支持本地调试。生产环境需换成已备案域名 + HTTPS。
 
 **7. Facebook 发布报 `#100 No permission`？**
-→ 说明用了用户 token 而非 Page token。确认授权时选了 Page，且「平台配置」里 `pageId` 已回填；仍异常可重新「授权」让系统重新拉取 Page token。
+→ 说明用了用户 token 而非 Page token。确认授权时选了 Page，且[平台配置](http://localhost:5173/#/platform-config)里 `pageId` 已回填；仍异常可重新「授权」让系统重新拉取 Page token。
 
 **8. Instagram 发布报 `Error 36003`（无法抓取视频）？**
 → 对象存储 URL 非公网或已过期。确认 `STORAGE_*` 配置正确、桶允许公网读取、预签名 URL 未过期；本地测试确保后端能访问到 MinIO/OSS 且 IG 能访问该公网地址。

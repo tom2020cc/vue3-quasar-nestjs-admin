@@ -1,113 +1,124 @@
-import { Injectable } from '@nestjs/common'
-import {
-  createWriteStream,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmdirSync,
-  statSync,
-  unlinkSync,
-} from 'fs'
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
+import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
 
-// 视频最终目录与分片临时目录
-const videoDir = join(process.cwd(), 'uploads', 'videos')
-export const chunksDir = join(videoDir, '.chunks')
-
-// 上传 ID 只保留安全字符，避免路径穿越
-export function sanitizeUploadId(id: string): string {
-  return (id || '').replace(/[^a-zA-Z0-9_-]/g, '') || 'unknown'
-}
-
-// 根据扩展名推断 MIME 类型
+export const CHUNK_SIZE = 5 * 1024 * 1024
+export const MAX_VIDEO_SIZE = 500 * 1024 * 1024
 export function guessMime(filename: string): string {
-  const map: Record<string, string> = {
-    '.mp4': 'video/mp4',
-    '.mov': 'video/quicktime',
-    '.webm': 'video/webm',
-    '.mkv': 'video/x-matroska',
-    '.avi': 'video/x-msvideo',
-    '.m4v': 'video/x-m4v',
-    '.flv': 'video/x-flv',
-  }
+  const map = { '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.m4v': 'video/x-m4v', '.flv': 'video/x-flv' }
   return map[extname(filename).toLowerCase()] || 'video/mp4'
 }
-
-// 生成随机视频文件名（与单文件上传保持一致格式，供单文件/分片合并共用）
-export function randomVideoName(ext: string): string {
-  const randomName = Array(8)
-    .fill(null)
-    .map(() => Math.round(Math.random() * 9).toString(36))
-    .join('')
-  return `${Date.now()}-${randomName}${ext}`
-}
-
-export interface MergeResult {
-  ok: boolean
-  missing?: number[]
-  filename?: string
-  size?: number
-  hash?: string
+export function randomVideoName(ext: string): string { return `${Date.now()}-${randomUUID()}${ext}` }
+export interface UploadResult { filename: string; url: string; size: number; hash: string; mimetype: string }
+export interface UploadManifest {
+  uploadId: string; fileName: string; fileSize: number; chunkHashes: string[]; result?: UploadResult
 }
 
 @Injectable()
 export class VideoUploadService {
-  // 查询某 uploadId 已上传的分片索引（升序）
-  uploadedChunks(uploadId: string): number[] {
-    const dir = join(chunksDir, sanitizeUploadId(uploadId))
-    if (!existsSync(dir)) return []
-    return readdirSync(dir)
-      .filter((f) => /^chunk_\d+$/.test(f))
-      .map((f) => Number(f.replace('chunk_', '')))
-      .sort((a, b) => a - b)
+  // Sessions are private, outside the static /uploads directory; owner namespacing isolates users.
+  private root = process.cwd()
+  private merges = new Map<string, Promise<UploadResult>>()
+  private directory(owner: number, id: string) {
+    if (!Number.isSafeInteger(owner) || owner < 1 || !/^[a-f0-9]{64}$/.test(id || '')) throw new BadRequestException('上传标识无效')
+    return join(this.root, '.upload-sessions', String(owner), id)
   }
-
-  // 将分片按序合并为最终视频文件，同时计算内容哈希（用于后续重复检测）
-  async mergeChunks(uploadId: string, fileName: string, totalChunks: number): Promise<MergeResult> {
-    const dir = join(chunksDir, sanitizeUploadId(uploadId))
-
-    // 校验分片是否齐全
-    const missing: number[] = []
-    for (let i = 0; i < totalChunks; i++) {
-      if (!existsSync(join(dir, `chunk_${i}`))) missing.push(i)
+  private read(owner: number, id: string): UploadManifest {
+    const path = join(this.directory(owner, id), 'manifest.json')
+    if (!existsSync(path)) throw new NotFoundException('请先初始化上传')
+    return JSON.parse(readFileSync(path, 'utf8'))
+  }
+  private save(dir: string, value: UploadManifest) {
+    const temp = join(dir, `manifest-${randomUUID()}.tmp`)
+    writeFileSync(temp, JSON.stringify(value))
+    renameSync(temp, join(dir, 'manifest.json'))
+  }
+  initialize(owner: number, input: UploadManifest) {
+    if (!input || typeof input.fileName !== 'string' || !input.fileName.trim() || input.fileName.length > 255 ||
+        !Number.isSafeInteger(input.fileSize) || input.fileSize <= 0 || input.fileSize > MAX_VIDEO_SIZE ||
+        !Array.isArray(input.chunkHashes) || input.chunkHashes.length !== Math.ceil(input.fileSize / CHUNK_SIZE) ||
+        input.chunkHashes.some(h => typeof h !== 'string' || !/^[a-f0-9]{64}$/.test(h))) throw new BadRequestException('文件无效，支持 0–500 MB 的视频')
+    const expectedId = createHash('sha256').update(input.chunkHashes.join('')).digest('hex')
+    if (expectedId !== input.uploadId) throw new BadRequestException('文件指纹不匹配')
+    const dir = this.directory(owner, input.uploadId)
+    mkdirSync(dir, { recursive: true })
+    if (existsSync(join(dir, 'manifest.json'))) {
+      const old = this.read(owner, input.uploadId)
+      if (old.fileSize !== input.fileSize) throw new ConflictException('文件大小不匹配')
+    } else {
+      this.save(dir, { uploadId: input.uploadId, fileName: input.fileName, fileSize: input.fileSize, chunkHashes: input.chunkHashes })
     }
-    if (missing.length > 0) return { ok: false, missing }
-
-    const finalName = randomVideoName(extname(fileName) || '.mp4')
-    const finalPath = join(videoDir, finalName)
+    return this.status(owner, input.uploadId)
+  }
+  status(owner: number, id: string) {
+    const manifest = this.read(owner, id)
+    const dir = this.directory(owner, id)
+    if (manifest.result && existsSync(join(this.root, 'uploads', 'videos', manifest.result.filename))) {
+      return { uploaded: manifest.chunkHashes.map((_, i) => i), result: manifest.result }
+    }
+    const uploaded: number[] = []
+    for (let i = 0; i < manifest.chunkHashes.length; i++) {
+      const path = join(dir, `chunk_${i}`)
+      if (existsSync(path) && statSync(path).size === Math.min(CHUNK_SIZE, manifest.fileSize - i * CHUNK_SIZE) &&
+          createHash('sha256').update(readFileSync(path)).digest('hex') === manifest.chunkHashes[i]) uploaded.push(i)
+    }
+    return { uploaded, result: undefined as UploadResult | undefined }
+  }
+  commitChunk(owner: number, id: string, index: number, buffer: Buffer) {
+    const manifest = this.read(owner, id)
+    const dir = this.directory(owner, id)
+    if (this.merges.has(dir)) throw new ConflictException('正在合并，请稍后重试')
+    if (!Number.isSafeInteger(index) || index < 0 || index >= manifest.chunkHashes.length || !buffer ||
+        buffer.length !== Math.min(CHUNK_SIZE, manifest.fileSize - index * CHUNK_SIZE) ||
+        createHash('sha256').update(buffer).digest('hex') !== manifest.chunkHashes[index]) throw new BadRequestException('分片大小或校验值不匹配，请重传')
+    // Multer has fully received the bounded chunk before this atomic commit; partial requests never count.
+    const temporary = join(dir, `chunk-${randomUUID()}.tmp`)
+    writeFileSync(temporary, buffer)
+    renameSync(temporary, join(dir, `chunk_${index}`))
+    return { uploadId: id, chunkIndex: index }
+  }
+  async merge(owner: number, id: string): Promise<UploadResult> {
+    const dir = this.directory(owner, id)
+    const running = this.merges.get(dir)
+    if (running) return running
+    const work = this.mergeOnce(owner, id)
+    this.merges.set(dir, work)
+    try { return await work } finally { this.merges.delete(dir) }
+  }
+  private async mergeOnce(owner: number, id: string): Promise<UploadResult> {
+    const manifest = this.read(owner, id)
+    const status = this.status(owner, id)
+    if (status.result) return status.result // Retrying a lost merge response returns the same file.
+    if (status.uploaded.length !== manifest.chunkHashes.length) throw new BadRequestException('分片不完整或损坏，请继续上传')
+    const dir = this.directory(owner, id)
+    const videoDir = join(this.root, 'uploads', 'videos')
     mkdirSync(videoDir, { recursive: true })
-
-    // 边写边算 SHA-256
+    const extension = extname(manifest.fileName).toLowerCase()
+    const filename = randomVideoName(/^\.(mp4|mov|webm|mkv|avi|m4v|flv)$/.test(extension) ? extension : '.mp4')
+    const finalPath = join(videoDir, filename)
+    const temporary = join(dir, 'merged.tmp')
     const hash = createHash('sha256')
-    const writeStream = createWriteStream(finalPath)
-    for (let i = 0; i < totalChunks; i++) {
-      const buf = readFileSync(join(dir, `chunk_${i}`))
-      hash.update(buf)
-      if (!writeStream.write(buf)) {
-        await new Promise<void>((resolve) => writeStream.once('drain', () => resolve()))
+    async function* chunks() {
+      for (let i = 0; i < manifest.chunkHashes.length; i++) {
+        const buffer = readFileSync(join(dir, `chunk_${i}`))
+        hash.update(buffer)
+        yield buffer
       }
     }
-    writeStream.end()
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on('finish', () => resolve())
-      writeStream.on('error', reject)
-    })
-
-    // 清理分片目录
     try {
-      for (let i = 0; i < totalChunks; i++) unlinkSync(join(dir, `chunk_${i}`))
-      rmdirSync(dir)
-    } catch {
-      // 清理失败不影响上传结果
-    }
-
-    return {
-      ok: true,
-      filename: finalName,
-      size: statSync(finalPath).size,
-      hash: hash.digest('hex'),
+      await pipeline(Readable.from(chunks()), createWriteStream(temporary))
+      renameSync(temporary, finalPath)
+      const result: UploadResult = { filename, url: `/uploads/videos/${filename}`, size: manifest.fileSize, hash: hash.digest('hex'), mimetype: guessMime(filename) }
+      this.save(dir, { ...manifest, result })
+      // Keep the receipt for resume after browser refresh / server restart, remove only known chunk files.
+      for (let i = 0; i < manifest.chunkHashes.length; i++) { try { unlinkSync(join(dir, `chunk_${i}`)) } catch {} }
+      return result
+    } catch (error) {
+      if (existsSync(temporary)) unlinkSync(temporary)
+      throw error
     }
   }
 }

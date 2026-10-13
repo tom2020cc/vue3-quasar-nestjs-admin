@@ -36,6 +36,11 @@
   .toc a { color:var(--blue); text-decoration:none; }
   .toc a:hover { text-decoration:underline; }
   footer { text-align:center; color:#9ca3af; font-size:13px; padding:24px; }
+
+  .step-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 18px; }
+  .step-links a { display: inline-block; padding: 7px 12px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; color: #1d4ed8; text-decoration: none; font-size: 14px; }
+  .step-links a:hover { background: #dbeafe; text-decoration: underline; }
+  .step-links span { flex-basis: 100%; color: #64748b; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -67,6 +72,7 @@
   <div class="tip">快手是国内平台，<strong>不需要翻墙</strong>；但通常要求<strong>企业资质</strong>才能申请发布能力。</div>
 
   <h2 id="account">二、第 1 步：注册开发者账号 &amp; 创建应用</h2>
+  <div class="step-links"><a href="https://open.kuaishou.com" target="_blank" rel="noopener noreferrer">快手开放平台 ↗</a></div>
   <ol>
     <li>打开 <a href="https://open.kuaishou.com" target="_blank">快手开放平台</a>，注册 / 登录开发者账号（通常需企业资质）。</li>
     <li>创建应用，得到两个值：
@@ -78,16 +84,19 @@
   </ol>
 
   <h2 id="scope">三、第 2 步：申请「发布视频」能力</h2>
+  <div class="step-links"><a href="https://open.kuaishou.com" target="_blank" rel="noopener noreferrer">快手开放平台 ↗</a><span>打开后选择自己的应用，再按下方步骤操作。</span></div>
   <ol>
     <li>在应用的「能力 / 权限」中申请 <strong>「发布视频到快手」</strong>（scope <code>user_video_publish</code>）。</li>
     <li>通过审核后才能正常授权与发布。</li>
   </ol>
 
   <h2 id="callback">四、第 3 步：配置回调地址</h2>
+  <div class="step-links"><a href="https://open.kuaishou.com" target="_blank" rel="noopener noreferrer">快手开放平台 ↗</a><span>打开后选择自己的应用，再按下方步骤操作。</span></div>
   <p>在应用的「安全设置 / 回调配置」中填写：</p>
   <pre><code>http://localhost:5001/platform/kuaishou/oauth/callback</code></pre>
 
   <h2 id="fill">五、第 4 步：填进系统「平台配置」页</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <ol>
     <li>打开系统「平台配置」页，找到「<strong>快手</strong>」，点「<strong>配置</strong>」。</li>
     <li>填两项，其它留空：
@@ -100,12 +109,14 @@
   </ol>
 
   <h2 id="auth">六、第 5 步：点「授权」完成授权</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <ol>
     <li>快手那一行点「<strong>授权</strong>」，跳转快手授权页，授权 <code>user_video_publish</code>。</li>
     <li>授权成功自动回填 <code>accessToken</code> + <code>refreshToken</code> + <code>openId</code>。</li>
   </ol>
 
   <h2 id="success">七、成功标志</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a> <a href="/#/publish" target="_blank" rel="noopener noreferrer">打开视频发布 ↗</a></div>
   <div class="card">
     <ul style="margin:0">
       <li>页面弹出：<strong>「快手 授权成功，令牌已保存」</strong></li>
@@ -114,6 +125,7 @@
   </div>
 
   <h2 id="errors">八、易错点汇总</h2>
+  <div class="step-links"><a href="https://open.kuaishou.com" target="_blank" rel="noopener noreferrer">快手开放平台 ↗</a> <a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <table>
     <tr><th style="width:26%">坑</th><th>现象 / 原因</th><th style="width:42%">解决办法</th></tr>
     <tr><td><strong>发布是异步的</strong></td><td>发布后约 1 分钟才生效</td><td>正常现象，系统会轮询最终状态</td></tr>

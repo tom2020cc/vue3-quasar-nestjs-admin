@@ -124,7 +124,8 @@
       <li><a href="#auth">第 6 步：点「授权」完成授权</a></li>
       <li><a href="#success">成功标志</a></li>
       <li><a href="#errors">易错点汇总（踩坑大全）</a></li>
-      <li><a href="#terms">名词对照表</a></li>
+      <li><a href="#publish-playlist">发布时选择或新建播放列表</a></li>
+    <li><a href="#terms">名词对照表</a></li>
     </ol>
   </div>
 
@@ -259,7 +260,7 @@ Security</code></pre>
       <li>刷新令牌（<code>refresh_token</code>）已自动存进数据库，之后发视频不再需要重新授权</li>
     </ul>
   </div>
-  <p>授权成功后，回「视频发布」页选一个<strong>横屏（宽屏）</strong>视频，勾选「油管 YouTube」即可真实发布。</p>
+  <p>授权成功后，回「视频发布」页选一个<strong>横屏或竖屏</strong>视频，勾选「油管 YouTube」即可真实发布。</p>
 
   <h2 id="errors">十、易错点汇总（踩坑大全）</h2>
   <table>
@@ -301,6 +302,24 @@ Security</code></pre>
     </tr>
   </table>
 
+<section id="publish-playlist" class="card">
+  <p><strong>横屏、竖屏均可发布：</strong>选择“窄屏（竖屏）”后 YouTube 仍可选，单个和批量发布均支持。旧版“仅宽屏”是项目筛选配置的问题，已修正。Shorts 分类由 YouTube 判断，参见<a href="https://support.google.com/youtube/answer/15424877?hl=zh-Hans" target="_blank" rel="noopener">官方说明</a>。</p>
+  <figure><img src="frontend/public/guides/images/youtube-publish-playlists/03-portrait-supported.png" alt="竖屏模式下 YouTube 已可选" style="max-width:100%;height:auto"><figcaption>内部浏览器验证：选择竖屏后可勾选 YouTube，未发布视频。</figcaption></figure>
+
+  <h2>发布视频时选择或新建播放列表（2026-10-09）</h2>
+  <ol>
+    <li>打开<a href="http://localhost:5173/#/publish" target="_blank" rel="noopener">视频发布</a>，选择 YouTube 平台和目标频道。</li>
+    <li>在“所属播放列表”中选择已有列表。留空表示不加入列表；切换频道会自动清空原选择，并加载新频道的列表。批量发布时，所有 YouTube 视频使用同一个列表。</li>
+    <li>需要新列表时点“新建列表”，输入名称并选择私密、不公开或公开，再点“创建并选择”。这一步会立即在所选 YouTube 频道创建列表，即使尚未发布视频，列表也已存在。列表可见范围不改变视频自身可见性。</li>
+    <li>填写视频标题和详情，确认频道及列表后点击发布。任务详情显示所属列表和是否已加入。视频转码完成后加入列表；如果这一步失败，可修复授权或网络后点重试，系统继续处理已上传的视频，不重新上传。</li>
+  </ol>
+  <p><strong>旧账号可能需要重新授权：</strong>创建列表和添加视频需要 <code>youtube.force-ssl</code> 权限。若提示缺少播放列表管理权限，在<a href="http://localhost:5173/#/platform-config" target="_blank" rel="noopener">平台配置 → YouTube 账号管理</a>中对该频道重新授权。必要时在<a href="https://console.cloud.google.com/auth/scopes?project=shanbo-search-console" target="_blank" rel="noopener">Google 数据访问权限</a>添加此范围，再返回应用重新授权。授权完成后重新备份本地私有配置。</p>
+  <p>如果创建请求中断，请先刷新列表确认是否已创建，再决定是否重试，避免重名列表。已经成功发布的视频仍按原规则去重，不能通过再次发布把它移动到另一列表。</p>
+  <figure><img src="frontend/public/guides/images/youtube-publish-playlists/01-select-playlist.png" alt="发布页选择 ShanBo 的已有播放列表" style="max-width:100%;height:auto"><figcaption>实测：发布页读取并选择真实频道的列表。</figcaption></figure>
+  <figure><img src="frontend/public/guides/images/youtube-publish-playlists/02-create-playlist-dialog.png" alt="新建播放列表弹窗及可见范围" style="max-width:100%;height:auto"><figcaption>新建入口实测截图，示例名称未提交。验证未创建线上列表、未发布视频；写入流程通过模拟官方接口测试。</figcaption></figure>
+  <p>官方接口说明：<a href="https://developers.google.com/youtube/v3/docs/playlists/insert" target="_blank" rel="noopener">创建播放列表</a> · <a href="https://developers.google.com/youtube/v3/docs/playlistItems/insert" target="_blank" rel="noopener">将视频加入列表</a>。</p>
+</section>
+
   <h2 id="terms">十一、名词对照表</h2>
   <table>
     <tr><th>我们的系统字段</th><th>Google 的叫法</th><th>说明</th></tr>
@@ -320,6 +339,9 @@ Security</code></pre>
 </div>
 
 <footer>油管 YouTube 接入教程 · 含新版界面与全部易错点 · 更新于 2026-08-17</footer>
+
+
+
 
 </body>
 </html>

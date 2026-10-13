@@ -2,8 +2,8 @@
   <q-layout view="hHh LpR fFf">
     <q-header elevated class="bg-primary text-white">
       <q-toolbar>
-        <q-btn flat dense round icon="menu" @click="leftDrawerOpen = !leftDrawerOpen" />
-        <q-toolbar-title>Quasar + NestJS 后台管理</q-toolbar-title>
+        <q-btn flat dense round icon="menu" aria-label="切换导航菜单" @click="leftDrawerOpen = !leftDrawerOpen" />
+        <q-toolbar-title>视频创作工作台</q-toolbar-title>
 
         <q-btn-dropdown flat no-caps no-icon>
           <template #label>
@@ -33,7 +33,6 @@
 
     <q-drawer
       v-model="leftDrawerOpen"
-      show-if-above
       bordered
       :width="220"
       :breakpoint="768"
@@ -69,6 +68,10 @@
             <q-item-section avatar><q-icon name="movie" /></q-item-section>
             <q-item-section>视频发布</q-item-section>
           </q-item>
+          <q-item clickable v-ripple to="/publish-records">
+            <q-item-section avatar><q-icon name="history" /></q-item-section>
+            <q-item-section>发布记录</q-item-section>
+          </q-item>
           <q-item clickable v-ripple :to="'/video-library'">
             <q-item-section avatar><q-icon name="video_library" /></q-item-section>
             <q-item-section>视频库</q-item-section>
@@ -77,13 +80,9 @@
             <q-item-section avatar><q-icon name="smart_display" /></q-item-section>
             <q-item-section>油管视频</q-item-section>
           </q-item>
-          <q-item clickable v-ripple :to="'/tiktok-videos'">
-            <q-item-section avatar><q-icon name="music_note" /></q-item-section>
-            <q-item-section>TikTok 视频</q-item-section>
-          </q-item>
           <q-item clickable v-ripple :to="'/platform-config'">
             <q-item-section avatar><q-icon name="settings" /></q-item-section>
-            <q-item-section>平台配置</q-item-section>
+            <q-item-section>平台管理</q-item-section>
           </q-item>
           <q-item clickable v-ripple :to="'/platform-tutorial'">
             <q-item-section avatar><q-icon name="school" /></q-item-section>
@@ -106,7 +105,7 @@ import { useRouter } from 'vue-router'
 import { useMyTokenStore } from '@/stores/myToken'
 import { getInfo } from '@/api/users'
 
-const leftDrawerOpen = ref(true)
+const leftDrawerOpen = ref(false)
 const router = useRouter()
 const tokenStore = useMyTokenStore()
 const userEmail = ref('')

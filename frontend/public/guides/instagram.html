@@ -36,137 +36,29 @@
   .toc a { color:var(--blue); text-decoration:none; }
   .toc a:hover { text-decoration:underline; }
   footer { text-align:center; color:#9ca3af; font-size:13px; padding:24px; }
+
+  .step-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 18px; }
+  .step-links a { display: inline-block; padding: 7px 12px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; color: #1d4ed8; text-decoration: none; font-size: 14px; }
+  .step-links a:hover { background: #dbeafe; text-decoration: underline; }
+  .step-links span { flex-basis: 100%; color: #64748b; font-size: 13px; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>Instagram 接入教程</h1>
-  <p>专业账号 + 绑定 Facebook Page + 对象存储托管视频，用 Content Publishing API 发布 Reels / 视频</p>
-</header>
-
+<header><h1>Instagram 创作者账号接入</h1><p>Instagram 直接授权 · 不需要绑定 Facebook 公共主页</p></header>
 <div class="container">
-
-  <div class="tip">Instagram 发布能力已接入，可直接使用。除 Meta 侧准备外，<strong>还需配置对象存储</strong>（IG 要求视频先有公网 URL），下方按步骤操作即可。</div>
-
-  <div class="toc">
-    <h3 style="margin-top:0">📑 目录</h3>
-    <ol>
-      <li><a href="#intro">平台介绍</a></li>
-      <li><a href="#account">第 1 步：注册 Meta 开发者 &amp; 创建 App</a></li>
-      <li><a href="#scope">第 2 步：申请 Instagram 发布权限</a></li>
-      <li><a href="#callback">第 3 步：配置回调地址</a></li>
-      <li><a href="#asset">第 4 步：准备账号资产（专业账号 + 绑定 Page）</a></li>
-      <li><a href="#storage">第 5 步：配置对象存储（必做）</a></li>
-      <li><a href="#fill">第 6 步：填进系统「平台配置」页</a></li>
-      <li><a href="#auth">第 7 步：点「授权」</a></li>
-      <li><a href="#success">成功标志</a></li>
-      <li><a href="#errors">易错点汇总</a></li>
-      <li><a href="#terms">名词对照表</a></li>
-    </ol>
-  </div>
-
-  <h2 id="intro">一、平台介绍</h2>
-  <p>Instagram 走 <strong>Content Publishing API</strong> 发布，只支持<strong>专业账号（Business / Creator）</strong>，普通个人号无法通过 API 发布。</p>
-  <div class="danger">Instagram 视频必须先托管到对象存储拿「公网 URL」，不能直接上传二进制；Reels 通过 API 发布目前仅支持 <strong>Business</strong> 账号。</div>
-
-  <h2 id="account">二、第 1 步：注册 Meta 开发者 &amp; 创建 App</h2>
-  <ol>
-    <li>打开 <a href="https://developers.facebook.com" target="_blank">Meta for Developers</a>，用你的 Facebook 账号登录。</li>
-    <li>进入「我的应用 → 创建应用」，应用类型选择 <strong>Business（商务）</strong>。</li>
-    <li>创建后记下：
-      <ul>
-        <li><strong>应用编号 App ID</strong> → 对应系统 <code>appId</code></li>
-        <li><strong>应用密钥 App Secret</strong> → 对应系统 <code>appSecret</code></li>
-      </ul>
-    </li>
-  </ol>
-  <div class="tip">Facebook 与 Instagram 共用同一个 Meta 应用，已按 Facebook 教程建过 App 可直接复用。</div>
-
-  <h2 id="scope">三、第 2 步：申请 Instagram 发布权限</h2>
-  <p>在「应用审核 → 权限和功能」中申请（Development Mode 下默认可直接使用）：</p>
-  <ul>
-    <li><code>instagram_business_basic</code> —— 读取 IG 专业账号信息</li>
-    <li><code>instagram_business_content_publish</code> —— 发布内容（核心）</li>
-  </ul>
-  <div class="warn">旧权限 <code>instagram_basic</code> / <code>instagram_content_publish</code> 已于 2025-01 废弃，务必用上面两个新权限。</div>
-
-  <h2 id="callback">四、第 3 步：配置回调地址</h2>
-  <p>在「Instagram → 基本显示 / Facebook Login」的 OAuth 设置中，加入下面的跳转 URI：</p>
-  <pre><code>http://localhost:5001/platform/instagram/oauth/callback</code></pre>
-
-  <h2 id="asset">五、第 4 步：准备账号资产</h2>
-  <ol>
-    <li>把你的 Instagram 账号切换为<strong>专业账号</strong>（IG 里：设置 → 账号类型和工具 → 切换为专业账号 → 选 Business）。</li>
-    <li>把该 IG 账号<strong>绑定</strong>到你的一个 Facebook Page（在 Meta 业务账户 / 专业账户中心里关联）。</li>
-  </ol>
-
-  <h2 id="storage">六、第 5 步：配置对象存储（必做）</h2>
-  <p>IG 发布时系统会先把视频上传到对象存储、生成公网 URL 再交给 IG 抓取。任选一个 <strong>S3 兼容</strong>存储（AWS S3 / 阿里云 OSS / 腾讯云 COS / MinIO 等），编辑 <code>backend/.env</code> 填入：</p>
-  <table>
-    <tr><th>变量</th><th>说明</th><th>示例</th></tr>
-    <tr><td><code>STORAGE_ENDPOINT</code></td><td>存储端点（含协议）</td><td><code>https://oss-cn-hangzhou.aliyuncs.com</code>；MinIO：<code>http://localhost:9000</code></td></tr>
-    <tr><td><code>STORAGE_REGION</code></td><td>区域</td><td><code>oss-cn-hangzhou</code> 或 <code>us-east-1</code></td></tr>
-    <tr><td><code>STORAGE_BUCKET</code></td><td>桶名</td><td><code>my-video-bucket</code></td></tr>
-    <tr><td><code>STORAGE_ACCESS_KEY</code></td><td>AccessKey</td><td>云厂商控制台获取</td></tr>
-    <tr><td><code>STORAGE_SECRET_KEY</code></td><td>SecretKey</td><td>同上</td></tr>
-    <tr><td><code>STORAGE_URL_EXPIRES</code></td><td>预签名 URL 有效期（秒）</td><td><code>172800</code>（48h）</td></tr>
-  </table>
-  <div class="danger">桶需<strong>公网可读</strong>，预签名 URL 让 IG 在有效期内抓取视频；填好后<strong>重启后端</strong>生效。</div>
-  <div class="tip">本地开发可用 Docker 起一个 MinIO 自建；生产建议用云厂商 OSS/COS，避免地址不可达导致 <code>Error 36003</code>。</div>
-
-  <h2 id="fill">七、第 6 步：填进系统「平台配置」页</h2>
-  <ol>
-    <li>打开系统「平台配置」页：<code>http://localhost:5173/#/platform-config</code>（登录 <code>admin@qq.com / admin123</code>）。</li>
-    <li>找到「Instagram」行，点「配置」，填：
-      <ul>
-        <li><strong>应用ID</strong> ← App ID</li>
-        <li><strong>应用密钥 client_secret</strong> ← App Secret</li>
-      </ul>
-    </li>
-    <li>点「保存」。</li>
-  </ol>
-
-  <h2 id="auth">八、第 7 步：点「授权」</h2>
-  <ol>
-    <li>Instagram 行点「授权」，跳转 Meta 授权页。</li>
-    <li>选择你的 IG 专业账号和关联 Page，同意授权。</li>
-    <li>授权成功自动跳回，令牌 + igUserId 已自动回填。</li>
-  </ol>
-
-  <h2 id="success">九、成功标志</h2>
-  <div class="card">
-    <ul style="margin:0">
-      <li>页面弹出「Instagram 授权成功，令牌已保存」</li>
-      <li>表格里 Instagram 行变成「已配置凭证」</li>
-      <li>数据库写入了 60 天长期 token + pageId + igUserId</li>
-      <li>发布时后端日志显示「上传对象存储成功」，IG 返回容器 <code>FINISHED</code> 后发布成功</li>
-    </ul>
-  </div>
-
-  <h2 id="errors">十、易错点汇总</h2>
-  <table>
-    <tr><th style="width:26%">坑</th><th>现象 / 原因</th><th style="width:42%">解决办法</th></tr>
-    <tr><td><strong>个人号无法发布</strong></td><td>IG 不是专业账号</td><td>切换为 Business 专业账号</td></tr>
-    <tr><td><strong>拿不到 IG 账号</strong></td><td>IG 未绑定 FB Page</td><td>在账户中心把 IG 绑定 Page</td></tr>
-    <tr><td><strong>视频抓取失败（Error 36003）</strong></td><td>视频 URL 非公网或已过期</td><td>确保对象存储 URL 公网可达且未过期</td></tr>
-    <tr><td><strong>发布时提示未配置存储</strong></td><td><code>STORAGE_*</code> 未填或填错</td><td>补齐 <code>backend/.env</code> 的 <code>STORAGE_*</code> 并重启后端</td></tr>
-    <tr><td><strong>发布被限流</strong></td><td>超过 25 条/24h</td><td>控制节奏，批量发布分批</td></tr>
-  </table>
-
-  <h2 id="terms">十一、名词对照表</h2>
-  <table>
-    <tr><th>系统字段</th><th>Instagram 叫法</th><th>说明</th></tr>
-    <tr><td><code>appId</code></td><td><code>App ID</code></td><td>应用编号</td></tr>
-    <tr><td><code>appSecret</code></td><td><code>App Secret</code></td><td>应用密钥</td></tr>
-    <tr><td><code>accessToken</code></td><td><code>长期 User Token</code></td><td>60 天用户令牌</td></tr>
-    <tr><td><code>openId</code></td><td><code>igUserId</code></td><td>Instagram 专业账号 ID</td></tr>
-    <tr><td><code>extra.pageId</code> / <code>extra.pageAccessToken</code></td><td><code>Page ID</code> / <code>Page Access Token</code></td><td>用于反查 IG 账号的关联 Page</td></tr>
-  </table>
-
-</div>
-
-<footer>Instagram 接入教程 · 更新于 2026-08-19</footer>
-
-</body>
-</html>
+<div class="warn">当前进度：项目已修正直接登录、令牌刷新与发布链接获取；模拟测试通过。尚未完成你的账号授权或真实发布验证。当前视频上传仍需对象存储。</div>
+<h2 id="intro">接入条件</h2><p>使用 Instagram 企业或创作者账号。请选择「Instagram API with Instagram Login」，不要混用 Facebook Login 的应用凭证、权限和令牌。</p>
+<div class="step-links"><a href="https://www.postman.com/meta/instagram/folder/6raa77c/instagram-api-with-instagram-login" target="_blank" rel="noopener noreferrer">Meta 官方 Instagram Login 说明</a><a href="/#/platform-config">本地平台配置</a></div>
+<h2 id="account">1. 准备开发者应用</h2><p>在 Meta 应用中添加 Instagram，进入「API setup with Instagram login」。按控制台要求配置应用角色、测试账号与访问权限。自己的测试账号与面向其他用户的应用，所需访问级别可能不同，不应把测试通过当成已完成正式审核。</p>
+<div class="step-links"><a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer">Meta 应用控制台</a></div>
+<h2 id="scope">2. 授予基本资料和发布权限</h2><p>本项目请求 <code>instagram_business_basic</code> 和 <code>instagram_business_content_publish</code>。使用目标 Instagram 账号授权，无需绑定 Facebook 公共主页。</p>
+<h2 id="callback">3. 登记回调地址</h2><p>将项目「平台配置」显示的后端地址加上 <code>/platform/instagram/oauth/callback</code>，在 Instagram 登录设置登记，协议、主机、端口及路径须完全一致。如果控制台要求 HTTPS，必须先配置合规且匹配的 HTTPS 回调。当前 localhost HTTP 地址是否可接受，需在实际控制台确认；项目不会自动建立公网隧道。</p>
+<h2 id="asset">4. 确认目标创作者账号</h2><p>确认授权页面的账号身份；授权后项目通过官方接口读取 Instagram 用户 ID 和用户名。当前 Instagram 配置只保存一个授权账号，重新授权会更新这一配置。</p>
+<h2 id="fill">5. 填写应用信息</h2><p>在本地平台配置中编辑 Instagram，填写 Instagram 产品登录设置提供的 <strong>Instagram App ID / Instagram App Secret</strong>。不要填 Facebook App ID、账号密码或其他平台凭证。密钥只保存在本机私有配置，不放进教程或截图。</p>
+<h2 id="auth">6. 点击授权</h2><p>保存配置后点击 Instagram 行的「授权」，在 Instagram 完成授权后返回项目。账号 ID、长期令牌与过期时间自动保存，不需要填写 refresh_token。有效长期令牌可通过「刷新令牌」更新；令牌失效或权限撤销后应重新授权。</p>
+<h2 id="storage">7. 准备视频存储</h2><p>当前实现通过 S3 兼容对象存储生成视频预签名 URL，供 Instagram 抓取。需要配置 STORAGE_ENDPOINT、STORAGE_REGION、STORAGE_BUCKET、STORAGE_ACCESS_KEY、STORAGE_SECRET_KEY。下载地址必须能被平台访问，签名在抓取期间须有效，不必公开整个桶。尚未实测的本地二进制直传不作为当前可用功能。</p>
+<h2 id="success">8. 核对真实发布结果</h2><p>账号授权和存储就绪后，选择一条获准测试的视频。项目创建媒体容器、等待处理，再提交发布。只有正式发布响应确认成功才标记完成，并查询官方 permalink；获取链接暂时失败时不伪造视频链接，也不因缺少链接重复上传。</p><p>模拟发布、容器创建成功、视频处理完成均不能单独证明公开视频已经发布。最终核对 Instagram 账号中的实际作品。</p>
+<h2 id="errors">常见问题</h2><ul><li>client_id 或令牌交换错误：核对 Instagram 产品中的应用 ID / Secret，不能混用 Facebook 凭证。</li><li>回调错误：核对完整地址和 HTTPS 要求。</li><li>权限不足：核对发布权限、应用角色及控制台访问级别。</li><li>视频抓取失败：核对预签名地址、网络可达性、有效期和视频格式。</li></ul>
+<h2 id="terms">状态含义</h2><p>「已配置凭证」表示本地有配置；「授权成功」表示令牌已保存；「发布成功」需要实际发布结果。当前尚待用户提供目标账号与开发者应用信息继续验证。</p>
+</div><footer>2026-10-12 · 本地接入准备</footer></body></html>

@@ -5,16 +5,20 @@
         <div>
           <div class="text-h6">TikTok 视频</div>
           <div class="text-caption text-grey-7 q-mt-xs">
-            直接拉取当前已授权 TikTok 账号已发布的视频信息（封面 / 时长 / 分辨率 / 播放 / 点赞 / 评论 / 分享）。
+            选择 TikTok 账号，查看该账号已发布的视频信息（封面 / 时长 / 分辨率 / 播放 / 点赞 / 评论 / 分享）。
           </div>
         </div>
-        <q-space />
+        <q-space /><q-btn outline color="primary" icon="open_in_new" label="TikTok 网页发布" to="/tiktok-browser-publish" class="q-mr-sm" />
+        <q-select v-model="accountId" :options="accountOptions" emit-value map-options outlined dense
+          label="选择 TikTok 账号" class="q-mr-md" style="min-width: 260px; max-width: 100%" />
+        <q-btn flat label="管理账号" to="/platform-config" class="q-mr-sm" />
         <q-btn
           color="primary"
           icon="cloud_download"
           label="获取视频"
           unelevated
           :loading="loading"
+          :disable="!accountId"
           @click="load"
         />
       </q-card-section>
@@ -35,10 +39,10 @@
           <q-spinner color="primary" size="3em" />
         </div>
         <div v-else-if="videos.length === 0" class="text-center text-grey-6 q-py-xl">
-          暂无视频，点击右上角「获取视频」拉取
+          {{ accountId ? '暂无视频，点击右上角「获取视频」拉取' : '请选择账号；没有可选账号时，请到平台配置添加授权' }}
         </div>
-        <div v-else class="row q-col-gutter-md">
-          <div v-for="v in videos" :key="v.id" class="col-12 col-sm-6 col-md-4 col-lg-3">
+        <div v-else class="video-grid">
+          <div v-for="v in videos" :key="v.id" class="video-grid-item">
             <q-card flat bordered class="full-height cursor-pointer" @click="openDetail(v)">
               <div v-if="v.cover" class="cover-wrap">
                 <img :src="v.cover" :alt="v.title" class="cover-img" />
@@ -116,11 +120,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Notify } from 'quasar'
-import { getTiktokVideos, type TiktokVideo } from '@/api/tiktok'
+import { getTiktokVideos, getTiktokAccounts, tiktokAccountLabel, type TiktokAccount, type TiktokVideo } from '@/api/tiktok'
 import { formatDuration, formatCount } from '@/utils/format'
 
+const accounts = ref<TiktokAccount[]>([])
+const accountId = ref<string | null>(null)
+const accountOptions = computed(() => accounts.value.filter(a => a.enabled && a.verified && a.hasCredential)
+  .map(a => ({ label: tiktokAccountLabel(a), value: a.id })))
+let requestVersion = 0
 const videos = ref<TiktokVideo[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -128,20 +137,28 @@ const detailDialog = ref(false)
 const detail = ref<TiktokVideo | null>(null)
 
 async function load() {
+  const id = accountId.value
+  const version = ++requestVersion
+  videos.value = []; detailDialog.value = false; detail.value = null; error.value = ''
+  if (!id) { loading.value = false; return }
   loading.value = true
-  error.value = ''
   try {
-    const res = await getTiktokVideos()
-    videos.value = res.data.data || []
+    const res = await getTiktokVideos(id)
+    if (version === requestVersion) videos.value = res.data.data || []
   } catch (e: any) {
+    if (version !== requestVersion) return
     const msg = e.response?.data?.message || '获取 TikTok 视频失败'
     error.value = msg
     Notify.create({ type: 'negative', message: msg })
-  } finally {
-    loading.value = false
-  }
+  } finally { if (version === requestVersion) loading.value = false }
 }
-onMounted(load)
+watch(accountId, load)
+onMounted(async () => {
+  try {
+    accounts.value = (await getTiktokAccounts()).data
+    if (accountOptions.value.length === 1) accountId.value = accountOptions.value[0].value
+  } catch { error.value = '账号列表加载失败，请刷新页面' }
+})
 
 function openDetail(v: TiktokVideo) {
   detail.value = v
@@ -160,6 +177,25 @@ function formatDateTime(s?: string) {
 </script>
 
 <style scoped>
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 16px;
+}
+.video-grid-item {
+  min-width: 0;
+}
+@media (max-width: 1023px) {
+  .video-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 599px) {
+  .video-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
 .cover-wrap {
   position: relative;
   aspect-ratio: 9 / 16;

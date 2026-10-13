@@ -13,7 +13,7 @@
 | 尺寸 | 平台编码 | 平台 | 说明 |
 | ---- | -------- | ---- | ---- |
 | 宽屏（横屏 `landscape`） | `douyin_cn` | 国产抖音 | 宽屏、窄屏均支持 |
-| 宽屏（横屏 `landscape`） | `youtube` | 油管 YouTube | 仅宽屏 |
+| 横屏 / 竖屏（`landscape` / `portrait`） | `youtube` | 油管 YouTube | 两种方向均支持 |
 | 宽屏（横屏 `landscape`） | `facebook` | Facebook | 宽屏、窄屏均支持 |
 | 窄屏（竖屏 `portrait`） | `douyin_cn` | 国产抖音 | 宽屏、窄屏均支持 |
 | 窄屏（竖屏 `portrait`） | `tiktok` | TikTok 海外版 | 仅窄屏 |
@@ -111,7 +111,7 @@
 
 > 单分片建议 20MB；超过 128MB 必须分片；时长 ≤15 分钟。
 
-### 3.2 油管 YouTube `youtube`（宽屏）
+### 3.2 油管 YouTube `youtube`（横屏、竖屏）
 
 - **官方文档**：https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol
 - **接口根地址**：`https://www.googleapis.com`（OAuth 令牌 `https://oauth2.googleapis.com`）

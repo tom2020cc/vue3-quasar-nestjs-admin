@@ -9,6 +9,15 @@ import {
 // 平台发布记录表：一条任务对应多个平台，每个平台一条记录
 @Entity()
 export class PublishRecord {
+  @Column({ type: 'text', nullable: true }) tiktokPrivacyLevel: string | null
+  @Column({ type: 'text', nullable: true }) youtubePlaylistId: string | null
+  @Column({ type: 'text', nullable: true }) youtubePlaylistTitle: string | null
+  @Column({ default: false }) youtubePlaylistAdded: boolean
+  @Column({ type: 'text', nullable: true }) tiktokAccountId: string | null
+  @Column({ type: 'text', nullable: true }) targetTiktokOpenId: string | null
+  @Column({ type: 'text', nullable: true }) targetTiktokAppId: string | null
+  @Column({ type: 'text', nullable: true }) targetTiktokName: string | null
+
   @PrimaryGeneratedColumn()
   id: number
 
@@ -17,6 +26,15 @@ export class PublishRecord {
 
   @Column({ comment: '平台编码：douyin_cn/youtube/tiktok/kuaishou' })
   platform: string
+
+  @Column({ type: 'text', nullable: true })
+  youtubeAccountId: string | null
+
+  @Column({ type: 'text', nullable: true })
+  targetChannelId: string | null
+
+  @Column({ type: 'text', nullable: true })
+  targetChannelTitle: string | null
 
   @Column({ default: 'pending', comment: '状态：pending/skipped/publishing/processing/success/failed' })
   status: string

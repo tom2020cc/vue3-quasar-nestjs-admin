@@ -24,7 +24,7 @@ export const guideSections: GuideSection[] = [
     color: 'negative',
     items: [
       '只用官方开放平台 API + OAuth 授权发布，绝不使用浏览器自动化、模拟点击或爬虫脚本——这是导致封号的最主要原因，且违反平台条款。',
-      '控制发布频率，不要短时间批量刷帖：Instagram 每账号 24 小时最多发布 25 条，平台级约 200 次调用/小时。',
+      '控制发布频率，按平台当前配额和接口返回处理限流，避免短时间重复提交。',
       '避免重复搬运：同一个视频反复发到多个账号 / 多个平台，比更换 IP 更容易触发风控。',
       '内容合规：不发布侵权、违规、低质或误导性内容。',
       '令牌类型要正确：Facebook 必须用 Page Access Token（页面令牌），Instagram 必须用专业账号，用错会直接报错。',
@@ -45,11 +45,11 @@ export const guideSections: GuideSection[] = [
     icon: 'share',
     color: 'indigo',
     items: [
-      'Instagram API 仅支持专业账号（Business / Creator），且必须绑定一个 Facebook Page；普通个人号无法通过 API 发布。',
-      'Instagram 视频必须先托管到对象存储拿「公网可访问的 URL」，不能直接上传二进制（与抖音/TikTok 不同）。',
-      'Development Mode 下只有 App 成员能授权：要把程序给别人用，需对方自建 Meta App，或你把他加为 App 测试者。',
-      'Meta 令牌约 60 天过期且无 refresh 刷新机制，过期后需在本页重新点击「授权」。',
-      'Instagram Reels 通过 API 发布目前仅支持 Business 账号（Creator 不支持）。',
+      'Instagram 直接登录支持企业 / 创作者账号，无需绑定 Facebook 公共主页；旧 Facebook Login 方式才需要关联主页。',
+      '本项目当前 Instagram 视频实现使用对象存储 URL；本地二进制直传尚未接入和实测。',
+      '先按 Meta 控制台要求配置应用角色 / 测试账号；面向其他用户时核对访问级别、审核和验证要求。',
+      'Instagram 直接登录的有效长期访问令牌可以刷新；过期或撤销后需要重新授权。无需填写 refresh_token。',
+      'Instagram 企业与创作者账号均可接入 Reels 内容发布；最终以权限授权和真实发布结果为准。',
     ],
   },
   {
@@ -57,9 +57,9 @@ export const guideSections: GuideSection[] = [
     icon: 'cloud_upload',
     color: 'deep-orange',
     items: [
-      'Instagram 通过 API 发布要求视频先有「公网可访问的 URL」，不能直接上传二进制；系统会在发布前把视频传到 S3 兼容对象存储并生成预签名 URL。',
+      '本项目当前 Instagram 上传方式：发布前把视频传到 S3 兼容对象存储，生成平台可读取的预签名 URL。',
       '在 backend/.env 填好 STORAGE_ENDPOINT / STORAGE_REGION / STORAGE_BUCKET / STORAGE_ACCESS_KEY / STORAGE_SECRET_KEY（AWS S3 / 阿里云 OSS / 腾讯云 COS / MinIO 均可），填完重启后端生效。',
-      '存储桶需公网可读，预签名 URL 需在 Instagram 抓取期间保持有效；URL 失效会报 Error 36003。',
+      '对象存储的下载地址须能被 Instagram 访问，预签名 URL 在抓取期间应保持有效；不需要把整个存储桶设为公开。',
       'Facebook / 油管 / TikTok / 抖音 / 快手 直接上传二进制，无需配置对象存储。',
     ],
   },

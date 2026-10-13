@@ -100,6 +100,14 @@
   }
   .kv { display: inline-block; background: #fff; border: 1px dashed var(--primary); color: var(--primary); border-radius: 6px; padding: 2px 10px; font-family: Consolas, monospace; font-weight: 600; }
   footer { text-align: center; color: #9ca3af; font-size: 13px; padding: 24px; }
+  figure { margin: 24px 0; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; }
+  figcaption { margin-top: 8px; font-size: 14px; color: #64748b; }
+
+  .step-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 18px; }
+  .step-links a { display: inline-block; padding: 7px 12px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; color: #1d4ed8; text-decoration: none; font-size: 14px; }
+  .step-links a:hover { background: #dbeafe; text-decoration: underline; }
+  .step-links span { flex-basis: 100%; color: #64748b; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -114,6 +122,11 @@
   <div class="toc">
     <h3 style="margin-top:0">📑 目录</h3>
     <ol>
+      <li><a href="#channel-playlists">按 YouTube 播放列表浏览</a></li>
+<li><a href="#video-list-details">视频列表、标题与详情</a></li>
+      <li><a href="#multi-account">多账号管理与发布时选择频道</a></li>
+      <li><a href="#second-account">第二个账号实操：403 排查、授权与频道选择</a></li>
+      <li><a href="#walkthrough">2026-10-07 实操截图与代理问题排查</a></li>
       <li><a href="#why">为什么油管最难弄</a></li>
       <li><a href="#prepare">第 0 步：翻墙准备（最重要）</a></li>
       <li><a href="#project">第 1 步：创建 Google Cloud 项目</a></li>
@@ -124,9 +137,118 @@
       <li><a href="#auth">第 6 步：点「授权」完成授权</a></li>
       <li><a href="#success">成功标志</a></li>
       <li><a href="#errors">易错点汇总（踩坑大全）</a></li>
-      <li><a href="#terms">名词对照表</a></li>
+      <li><a href="#publish-playlist">发布时选择或新建播放列表</a></li>
+    <li><a href="#terms">名词对照表</a></li>
     </ol>
   </div>
+
+  <div class="card" id="quick-links">
+    <h3 style="margin-top:0">常用页面直达</h3>
+    <p>Google Cloud 链接已指定当前项目 <code>shanbo-search-console</code>。使用其他项目时，请在控制台顶部切换项目。链接在新标签页打开，教程会保留。</p>
+<div class="step-links"><a href="https://console.cloud.google.com/welcome?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开当前 Google Cloud 项目 ↗</a> <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开 YouTube Data API v3 ↗</a> <a href="https://console.cloud.google.com/auth/branding?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开品牌 / 同意屏幕 ↗</a> <a href="https://console.cloud.google.com/auth/audience?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开目标对象 / 测试用户 ↗</a> <a href="https://console.cloud.google.com/auth/scopes?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开数据访问 / 权限范围 ↗</a> <a href="https://console.cloud.google.com/auth/clients?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开 OAuth 客户端 / 回调设置 ↗</a> <a href="https://console.cloud.google.com/auth/clients/create?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">创建 OAuth 客户端 ↗</a> <a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a> <a href="/#/publish" target="_blank" rel="noopener noreferrer">打开视频发布 ↗</a> <a href="/#/youtube-videos" target="_blank" rel="noopener noreferrer">打开油管视频列表 ↗</a></div>    <p>本地页面需要项目正在运行。没有固定地址的按钮（保存、添加测试用户、授权确认）请先打开所在页面再操作；回调地址用于填写，不能作为授权入口直接打开。</p>
+  </div>
+
+  <section id="channel-playlists" class="card">
+  <h2>按 YouTube 播放列表浏览（2026-10-09）</h2>
+  <div class="step-links"><a href="/#/youtube-videos" target="_blank" rel="noopener noreferrer">打开油管视频 ↗</a></div>
+  <ol>
+    <li>选择已授权的频道，系统自动读取视频与播放列表，也可点击「获取 / 刷新」。</li>
+    <li>频道有播放列表时，显示与 YouTube 分类对应的封面卡片、列表名称、可见性和视频数量；可以搜索列表。</li>
+    <li>点击卡片进入该列表，按原有列表顺序查看视频；点击视频标题或「视频详情」查看完整信息，点击「返回播放列表」返回分类。</li>
+    <li>「全部视频」保留频道的所有上传视频，包括未加入任何播放列表的视频。表格显示「所属列表」，一个视频属于多个列表时全部列出，点击列表名可进入；未归类显示「未加入播放列表」。表格不再显示可见性列，完整描述仍可通过右侧「视频详情」查看。频道没有播放列表时，不显示播放列表页签，直接显示视频。</li>
+  </ol>
+  <p>播放列表读取失败时会显示错误与重试提示，不会当成“没有播放列表”。本功能只读取既有分类，不会创建或修改 YouTube 播放列表。</p>
+  <figure><a href="images/youtube-playlists/01-channel-playlists.jpg" target="_blank" rel="noopener noreferrer"><img src="images/youtube-playlists/01-channel-playlists.jpg" alt="ShanBo 频道的 33 个播放列表" style="width:100%;border-radius:8px" loading="lazy"></a><figcaption>实测 ShanBo：33 个播放列表，全部视频入口保留 248 个视频。</figcaption></figure>
+  <figure><a href="images/youtube-playlists/02-playlist-videos.jpg" target="_blank" rel="noopener noreferrer"><img src="images/youtube-playlists/02-playlist-videos.jpg" alt="380-8 Excavator 播放列表中的 5 个视频" style="width:100%;border-radius:8px" loading="lazy"></a><figcaption>进入播放列表后，保留视频标题、视频详情、时长与统计信息。</figcaption></figure>
+  <figure><a href="images/youtube-playlists/04-video-membership.jpg" target="_blank" rel="noopener noreferrer"><img src="images/youtube-playlists/04-video-membership.jpg" alt="视频表格显示所属播放列表，不再显示可见性列" style="width:100%;border-radius:8px" loading="lazy"></a><figcaption>所属列表支持点击进入；完整描述保留在右侧「视频详情」中。</figcaption></figure>
+</section>
+
+<section id="video-list-details">
+    <h2>视频上传和展示：列表、标题与详情</h2>
+    <div class="step-links"><a href="/#/publish" target="_blank" rel="noopener noreferrer">打开视频发布 ↗</a> <a href="/#/youtube-videos" target="_blank" rel="noopener noreferrer">打开油管视频列表 ↗</a></div>
+    <p>「视频发布」与「油管视频」都提供视频列表、视频标题和「视频详情」入口。</p>
+    <ol>
+      <li><strong>待上传视频：</strong>选择文件后查看待上传列表，单个视频默认用文件名作为标题，可修改标题和视频详情 / 描述。批量发布时，每个视频可以填写自己的标题与描述，点击「视频详情」可预览文件、尺寸和时长。</li>
+      <li><strong>已上传视频：</strong>右侧「已上传视频列表 / 发布记录」可按标题或描述搜索；点击标题或「视频详情」，查看完整描述、本地视频预览、尺寸、时长和各平台发布结果。YouTube 记录保留原任务绑定的目标频道。</li>
+      <li><strong>油管视频：</strong>选择频道后点击「获取视频」，查看分页列表、封面、标题、详情摘要、时长、发布时间、可见性和播放量。可按标题或描述搜索，点击标题或「视频详情」查看完整内容及点赞、评论等信息。</li>
+    </ol>
+    <figure><a href="images/youtube-video-details/01-uploaded-video-detail.jpg" target="_blank"><img src="images/youtube-video-details/01-uploaded-video-detail.jpg" alt="已上传视频详情和发布结果" loading="lazy"></a><figcaption>查看已有上传记录，不会创建新的发布任务。</figcaption></figure>
+    <figure><a href="images/youtube-video-details/02-youtube-video-list.jpg" target="_blank"><img src="images/youtube-video-details/02-youtube-video-list.jpg" alt="RIG HJH 频道的视频列表、标题和详情" loading="lazy"></a><figcaption>本次读取到 RIG HJH 的 12 个视频，支持搜索和分页。</figcaption></figure>
+    <p class="note">此步骤含账号或网络隐私，截图仅保存在本机，请按上述文字操作。</p>
+    <p>本次验证了已有上传记录详情、频道视频列表、搜索和详情弹窗，没有实际上传或发布新视频。自动文件选择测试受 Chrome 扩展文件访问权限限制，未完成端到端上传验证。</p>
+  </section>
+
+  <section id="multi-account">
+    <h2>多账号管理：发布到另一个 YouTube 频道</h2>
+    <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a> <a href="https://console.cloud.google.com/auth/audience?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开目标对象 / 测试用户 ↗</a></div>
+    <p>Google Cloud 的应用可以供不同频道授权使用。本系统分别保存每个频道的令牌，新增账号不会覆盖原频道。</p>
+    <ol>
+      <li>在「平台配置 → YouTube 多账号 / 频道管理」点击「添加 YouTube 账号」。应用处于测试模式时，先将目标 Google 邮箱加入「目标对象 → 测试用户」。</li>
+      <li>由账号本人在 Google 页面登录，选择要发布的账号和频道并完成授权。返回系统后核对频道名称与 <code>UC…</code> 频道 ID。</li>
+      <li>原有授权已自动保留；如果显示「待识别频道」，点击「识别频道」即可。每个账号可以设置备注、停用或重新授权。</li>
+      <li>进入「视频发布」，勾选 YouTube，在「YouTube 目标频道（必选）」中选择频道，核对下方目标再提交。批量发布使用同一个所选频道。</li>
+      <li>进入「油管视频」可切换频道查看视频。新增或重新授权后点击「备份到根目录」，多账号授权会一起写入私密配置文件。</li>
+    </ol>
+    <figure><a href="images/youtube-multi-account/01-channel-management.jpg" target="_blank"><img src="images/youtube-multi-account/01-channel-management.jpg" alt="多账号管理保留原有 TomPlay 频道" loading="lazy"></a><figcaption>账号列表显示频道名称和 ID；可以继续添加另一个 Google 账号的频道。</figcaption></figure>
+    <figure><a href="images/youtube-multi-account/02-publish-channel.jpg" target="_blank"><img src="images/youtube-multi-account/02-publish-channel.jpg" alt="发布前选择 YouTube 目标频道" loading="lazy"></a><figcaption>此截图仅展示选择频道，没有上传或发布视频。</figcaption></figure>
+    <div class="tip">发布记录固定绑定所选频道。重试、查询和重复检测均按频道处理，上传前也会校验真实授权归属。旧任务没有频道绑定信息，需要重新选择频道创建任务。不要用「重新授权」切换该行的频道；增加另一个频道请点「添加 YouTube 账号」。</div>
+  </section>
+
+  <section id="second-account">
+    <h2>第二个账号实操：从 403 到双频道可选</h2>
+    <p>2026-10-07 已完成第二个账号的接入：原有 TomPlay 与新增 RIG HJH 同时保留，均显示「可选择发布」。新增账号无需重新创建 Google Cloud 项目或应用密钥。</p>
+    <h3>1. 在应用所属项目添加测试用户</h3>
+    <div class="step-links"><a href="https://console.cloud.google.com/auth/audience?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开目标对象 / 测试用户 ↗</a></div>
+    <p>如果 Google 提示 <code>403 access_denied</code>，并说明应用正在测试、仅限获批测试人员，先用项目管理员账号进入「<a href="https://console.cloud.google.com/auth/audience?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开目标对象 / 测试用户 ↗</a> → 测试用户 → Add users」。输入实际频道账号的邮箱，按 Enter 确认，再保存。</p>
+    <p class="note">此步骤含账号或网络隐私，截图仅保存在本机，请按上述文字操作。</p>
+    <p class="note">此步骤含账号或网络隐私，截图仅保存在本机，请按上述文字操作。</p>
+    <h3>2. 从目标账号所在的 Chrome 窗口发起授权</h3>
+    <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
+    <p>如果目标账号登录在另一个 Chrome 用户窗口，在<strong>那个窗口</strong>打开 <a href="/#/platform-config" target="_blank" rel="noopener noreferrer">本地平台配置页面 ↗</a>，登录本地后台后点击「添加 YouTube 账号」。也可在原窗口选择「使用其他账号」，再由账号本人登录目标账号。</p>
+    <p class="note">此步骤含账号或网络隐私，截图仅保存在本机，请按上述文字操作。</p>
+    <h3>3. 核对应用、账号和授权权限</h3>
+    <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
+    <p>添加测试用户后，本例进入「此应用未经 Google 验证」提示页。核对这是自己创建的应用，再由账号本人继续。下一页确认目标邮箱和请求权限，然后完成授权。以下两张图由用户在 RIG HJH 窗口提供，授权确认由用户本人完成。</p>
+    <p class="note">此步骤含账号或网络隐私，截图仅保存在本机，请按上述文字操作。</p>
+    <p class="note">此步骤含账号或网络隐私，截图仅保存在本机，请按上述文字操作。</p>
+    <h3>4. 确认两个频道并备份</h3>
+    <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
+    <p>返回后台后，列表同时显示 TomPlay（<code>UCOPlB7GS_-3k63D3Efvq2ZQ</code>）和 RIG HJH（<code>UCFKmN4BdcqO1s4QFuPRnaWw</code>）。已点击「备份到根目录」，页面确认保存 6 个平台、2 个 YouTube 账号及环境配置到被 Git 忽略的 <code>local-config.private.json</code>。</p>
+    <figure><a href="images/youtube-multi-account/08-two-channels-authorized.jpg" target="_blank"><img src="images/youtube-multi-account/08-two-channels-authorized.jpg" alt="TomPlay 与 RIG HJH 均为可选择发布" loading="lazy"></a><figcaption>新增账号没有覆盖原有频道。教程不记录令牌或明文密钥。</figcaption></figure>
+    <h3>5. 发布前明确选择 RIG HJH</h3>
+    <div class="step-links"><a href="/#/publish" target="_blank" rel="noopener noreferrer">打开视频发布 ↗</a></div>
+    <p>进入「视频发布」，勾选 YouTube，在「YouTube 目标频道（必选）」选择 RIG HJH，并核对下方目标频道 ID。批量发布也使用同一个所选频道。</p>
+    <figure><a href="images/youtube-multi-account/09-select-rig-channel.jpg" target="_blank"><img src="images/youtube-multi-account/09-select-rig-channel.jpg" alt="发布页已选择新增 RIG HJH 频道" loading="lazy"></a><figcaption>本次只验证选择频道，没有上传或发布视频；新增频道的实际上传尚未验证。</figcaption></figure>
+    <div class="tip">测试模式下，本项目请求的 YouTube 授权会在 7 天后过期，需要重新授权。见 <a href="https://support.google.com/cloud/answer/15549945?hl=en" target="_blank" rel="noopener">Google 测试用户说明</a>。</div>
+  </section>
+
+  <section id="walkthrough">
+    <h2>早期单账号实操记录：授权成功并读取频道视频</h2>
+    <p>2026-10-07，在 Windows 本地环境完成 YouTube 授权，页面显示「授权成功，令牌已保存」，并成功读取 TomPlay 频道的视频列表。本次没有上传或发布新视频。</p>
+    <div class="tip"><strong>本次排错结论：</strong>此前 Node 后端直连 Google 超时，通过本机代理可连通。用户调整代理软件后完成授权。成功时截图显示：<strong>系统代理关闭、虚拟网卡开启、出站为规则模式</strong>。这是此电脑的成功配置，不是所有环境都必须照搬的设置。</div>
+    <p class="note">此步骤含账号或网络隐私，截图仅保存在本机，请按上述文字操作。</p>
+    <h3>1. 找到 OAuth 客户端</h3>
+    <div class="step-links"><a href="https://console.cloud.google.com/auth/clients?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开 OAuth 客户端 / 回调设置 ↗</a></div>
+    <p>在创建凭证的 Google Cloud 项目中，进入「Google Auth Platform → 用户端」。Google Cloud 项目账号可以与发布频道的账号不同；测试用户要填写实际授权账号的邮箱。</p>
+    <figure><a href="images/youtube-setup/03-google-clients.jpg" target="_blank"><img src="images/youtube-setup/03-google-clients.jpg" alt="Google Auth Platform 用户端列表" loading="lazy"></a><figcaption>选择自己的 Web 应用客户端。本例名称为「YouTube本地发布工具」。</figcaption></figure>
+    <h3>2. 精确填写回调地址</h3>
+    <div class="step-links"><a href="https://console.cloud.google.com/auth/clients?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开 OAuth 客户端 / 回调设置 ↗</a></div>
+    <pre><code>http://localhost:5001/platform/youtube/oauth/callback</code></pre>
+    <p>该地址放在「已授权的重新导向 URI」，JavaScript 来源可以留空。务必使用自己的 Client ID 与密钥，不要复制截图中的客户端 ID。</p>
+    <figure><a href="images/youtube-setup/06-google-redirect-uri.jpg" target="_blank"><img src="images/youtube-setup/06-google-redirect-uri.jpg" alt="OAuth 客户端的本地回调 URI 设置" loading="lazy"></a><figcaption>此图用于说明回调字段；其他选项展示的是本例现有状态，并非必选项。</figcaption></figure>
+    <h3>3. 在本地系统填两项凭证</h3>
+    <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
+    <p>首次配置时，只需手动填「应用 ID」和「应用密钥」。access_token 与 refresh_token 会在授权成功后保存，open_id 对 YouTube 无需填写。备注可留空；已有令牌无需为了重试而清空。</p>
+    <figure><a href="images/youtube-setup/05-local-youtube-fields.jpg" target="_blank"><img src="images/youtube-setup/05-local-youtube-fields.jpg" alt="本地 YouTube 配置字段，应用密钥已遮蔽" loading="lazy"></a><figcaption>密钥保持隐藏，教程不记录明文密钥或令牌。</figcaption></figure>
+    <h3>4. 确认授权结果</h3>
+    <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
+    <p>保存配置后点击「授权」，选择测试用户名单中的实际频道账号，核对应用与所请求权限后完成授权。返回系统后，以成功提示和「已配置凭证」为准。</p>
+    <figure><a href="images/youtube-setup/09-authorization-success.png" target="_blank"><img src="images/youtube-setup/09-authorization-success.png" alt="YouTube 授权成功，令牌已保存" loading="lazy"></a><figcaption>用户提供的实际成功截图：绿色提示「授权成功，令牌已保存」。</figcaption></figure>
+    <h3>5. 验证读取频道</h3>
+    <div class="step-links"><a href="/#/youtube-videos" target="_blank" rel="noopener noreferrer">打开油管视频列表 ↗</a></div>
+    <p>进入「油管视频」，点击「获取视频」。核对显示的频道名称是否为目标频道。本例成功显示 TomPlay 的视频，说明令牌刷新与 YouTube 数据读取链路可用；尚未验证上传发布。</p>
+    <figure><a href="images/youtube-setup/08-youtube-videos-loaded.jpg" target="_blank"><img src="images/youtube-setup/08-youtube-videos-loaded.jpg" alt="成功读取 TomPlay 频道视频列表" loading="lazy"></a><figcaption>授权后的读取验证，不会创建或发布视频。</figcaption></figure>
+  </section>
 
   <h2 id="why">一、为什么油管最难弄</h2>
   <p>抖音 / 快手 / TikTok 都是在一个「开放平台网站」里直接建应用；但 <strong>Google 把这件事拆成了三层</strong>，而且还要单独配一个「同意屏幕」，所以步骤最多：</p>
@@ -136,35 +258,39 @@
   </div>
 
   <h2 id="prepare">二、第 0 步：翻墙准备（最重要）</h2>
+  <div class="step-links"><a href="https://www.google.com/" target="_blank" rel="noopener noreferrer">打开 Google 检查浏览器连接 ↗</a></div>
   <div class="danger">
     油管授权和发布，都需要<strong>后端服务器</strong>去调 Google 的接口（换 token、上传视频、查状态）。所以光浏览器能上 Google 不够，必须让<strong>后端程序也能上 Google</strong>。
   </div>
-  <p>很多同学卡在最后一步报 <code>授权失败：fetch failed</code>，原因就是：浏览器走了代理（翻墙软件），但后端程序没走，直接访问 Google 超时。</p>
-  <h4>✅ 正确做法</h4>
+  <p><code>授权失败：fetch failed</code> 表示后端网络请求失败。本次排查发现是直连 Google 超时，但该错误也可能由 DNS、证书或连接中断引起，应结合实际检查判断。</p>
+  <h4>检查后端的网络出口</h4>
   <ol>
-    <li>打开你的翻墙软件（Clash / Clash Verge / V2RayN / Shadowrocket 等）。</li>
-    <li>把模式从「系统代理 / PAC」改成 <strong>「全局模式」（Global）</strong> 或 <strong>「TUN 模式」（虚拟网卡 / 增强模式）</strong>。</li>
-    <li>让 <strong>所有程序</strong>（包括 Node 后端）都走代理。</li>
+    <li>确认浏览器能打开 Google，并确认后端也能访问 Google 令牌接口和 YouTube API。</li>
+    <li>若使用虚拟网卡（TUN），检查规则是否覆盖 Google 请求，并保留 localhost 的本地访问。</li>
+    <li>也可以只为 Node 后端显式设置代理。项目附带 <code>start-backend-proxy.bat</code>，适用于本机 Node.js 24+ 和已有的 <code>127.0.0.1:7890</code> HTTP 代理；使用前先停止原后端，前端保留运行。其他电脑需按实际端口配置。</li>
   </ol>
   <div class="warn">
-    <strong>必须用「全局 / TUN」模式</strong>，不能用「系统代理 / PAC」模式——后两种只有浏览器等"遵守系统代理的软件"会走代理，Node 后端默认不遵守，照样连不上 Google。
+    不必一律切换到全局模式，也不必一律关闭系统代理。关键是后端请求实际能够连通 Google。重启后端后需从系统重新点击「授权」，旧回调地址中的 code / state 不能复用。
   </div>
 
   <h2 id="project">三、第 1 步：创建 Google Cloud 项目</h2>
+  <div class="step-links"><a href="https://console.cloud.google.com/welcome?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开当前项目 ↗</a> <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener noreferrer">新建 Google Cloud 项目 ↗</a></div>
   <ol>
-    <li>打开 <a href="https://console.cloud.google.com/" target="_blank">Google Cloud 控制台</a>，<strong>用你自己的 Google 账号登录</strong>（就是你想发视频上去的那个账号）。</li>
+    <li>打开 <a href="https://console.cloud.google.com/welcome?project=shanbo-search-console" target="_blank">Google Cloud 控制台</a>，用有项目管理权限的 Google 账号登录；它可以与实际发布频道的账号不同。</li>
     <li>看页面<strong>最顶部中间</strong>，点「选择项目」→ 弹窗右上角「<strong>新建项目</strong>」。</li>
     <li>项目名随便起，比如 <code>video-upload</code>，点「创建」。</li>
     <li>等顶部那行显示你刚起的项目名，再进行下一步。</li>
   </ol>
 
   <h2 id="api">四、第 2 步：开通 YouTube Data API</h2>
+  <div class="step-links"><a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开 YouTube Data API v3 ↗</a> <a href="https://console.cloud.google.com/apis/dashboard?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">查看已启用的 API ↗</a></div>
   <ol>
     <li>左侧菜单 →「<strong>API 和服务</strong>」→「已启用的 API 和服务」→ 点「<strong>＋ 启用 API 和服务</strong>」。</li>
     <li>搜索框输入 <code>YouTube Data API v3</code>，点进去，点「<strong>启用</strong>」。</li>
   </ol>
 
   <h2 id="consent">五、第 3 步：配置 OAuth 同意屏幕（新版界面）</h2>
+  <div class="step-links"><a href="https://console.cloud.google.com/auth/branding?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开品牌 / 同意屏幕 ↗</a> <a href="https://console.cloud.google.com/auth/audience?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开目标对象 / 测试用户 ↗</a> <a href="https://console.cloud.google.com/auth/scopes?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开数据访问 / 权限范围 ↗</a></div>
   <div class="warn">
     Google 已经<strong>改版</strong>了！网上很多老教程写的「选 External → 点 Create」是<strong>老版本</strong>的按钮，新版里找不到。新版把这一步拆成了左侧菜单里的几个页面。
   </div>
@@ -177,6 +303,7 @@ Data access   （数据访问：权限 scope）
 Security</code></pre>
 
   <h4>① 点左侧「Branding」</h4>
+    <div class="step-links"><a href="https://console.cloud.google.com/auth/branding?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开品牌 / 同意屏幕 ↗</a></div>
   <ol>
     <li><strong>App name</strong>（应用名）：随便，比如 <code>video-upload</code></li>
     <li><strong>User support email</strong>（支持邮箱）：填你自己的邮箱</li>
@@ -184,9 +311,10 @@ Security</code></pre>
   </ol>
 
   <h4>② 点左侧「Audience」（老版的 External 在这里）</h4>
+    <div class="step-links"><a href="https://console.cloud.google.com/auth/audience?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开目标对象 / 测试用户 ↗</a></div>
   <ol>
     <li>把受众类型选成 <strong>External</strong>。</li>
-    <li>找到 <strong>Test users</strong>，点「<strong>Add users</strong>」，填<strong>你自己的邮箱</strong>。</li>
+    <li>找到 <strong>Test users</strong>，点「<strong>Add users</strong>」，填<strong>实际要授权发布的 Google 账号邮箱</strong>。</li>
     <li>点 <strong>Save</strong>。</li>
   </ol>
   <div class="tip">
@@ -194,6 +322,7 @@ Security</code></pre>
   </div>
 
   <h2 id="client">六、第 4 步：创建 OAuth 客户端，拿 Client ID / Secret</h2>
+  <div class="step-links"><a href="https://console.cloud.google.com/auth/clients?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开 OAuth 客户端 / 回调设置 ↗</a> <a href="https://console.cloud.google.com/auth/clients/create?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">创建 OAuth 客户端 ↗</a></div>
   <ol>
     <li>点左侧「<strong>Clients</strong>」，点「<strong>Create OAuth client</strong>」。</li>
     <li>Application type 选 <strong>Web application</strong>。</li>
@@ -225,10 +354,11 @@ Security</code></pre>
   </ul>
 
   <h2 id="fill">七、第 5 步：填进系统「平台配置」页</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <ol>
-    <li>打开我们系统的「平台配置」页：<code>http://localhost:5173/#/platform-config</code>（若要求登录，用 <code>admin@qq.com / admin123</code>）。</li>
+    <li>打开我们系统的「平台配置」页：<a href="/#/platform-config" target="_blank" rel="noopener noreferrer">本地平台配置页面 ↗</a>（若要求登录，用 <code>admin@qq.com / admin123</code>）。</li>
     <li>找到「<strong>油管 YouTube</strong>」这一行，点右边的「<strong>配置</strong>」按钮。</li>
-    <li>只填这两项，其它全部留空：
+    <li>首次配置只需手动填写这两项（已有令牌无需清空）：
       <ul>
         <li><strong>应用ID（client_key / client_id）</strong> ← 粘贴 <strong>Client ID</strong></li>
         <li><strong>应用密钥 client_secret</strong> ← 粘贴 <strong>Client Secret</strong></li>
@@ -238,8 +368,9 @@ Security</code></pre>
   </ol>
 
   <h2 id="auth">八、第 6 步：点「授权」完成授权</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a> <a href="https://console.cloud.google.com/auth/audience?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开目标对象 / 测试用户 ↗</a></div>
   <ol>
-    <li>回到表格，油管 YouTube 那一行点「<strong>授权</strong>」按钮，浏览器跳转到 Google。</li>
+    <li>回到表格，油管 YouTube 那一行点「<strong>添加账号</strong>」，或在下方频道管理点「添加 YouTube 账号」，浏览器跳转到 Google。</li>
     <li>选<strong>你刚才加进"测试用户"的那个 Google 账号</strong>。</li>
     <li>大概率会弹红字警告 <strong>"Google 未验证此应用"</strong>：
       <ul>
@@ -247,27 +378,29 @@ Security</code></pre>
         <li>再点「<strong>前往 xxx（不安全）/ Go to xxx (unsafe)</strong>」</li>
       </ul>
     </li>
-    <li>点「<strong>允许 / Allow</strong>」授权 <code>youtube.upload</code> 权限。</li>
-    <li>授权成功会自动跳回系统，弹绿色提示，油管那一行变成「已配置凭证」。</li>
+    <li>核对应用身份与所选账号，确认授权 <code>youtube.upload</code>（视频上传）和 <code>youtube.readonly</code>（读取频道）、<code>youtube.force-ssl</code>（包括管理播放列表）权限。</li>
+    <li>授权成功会自动跳回系统，弹成功提示，下方频道管理出现对应频道。</li>
   </ol>
 
   <h2 id="success">九、成功标志</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a> <a href="/#/publish" target="_blank" rel="noopener noreferrer">打开视频发布 ↗</a> <a href="/#/youtube-videos" target="_blank" rel="noopener noreferrer">打开油管视频列表 ↗</a></div>
   <div class="card">
     <ul style="margin:0">
-      <li>页面弹出：<strong>「油管 YouTube 授权成功，令牌已保存」</strong></li>
-      <li>「平台配置」表格里油管那一行的凭证状态变成 <strong>「已配置凭证」</strong>（绿色）</li>
-      <li>刷新令牌（<code>refresh_token</code>）已自动存进数据库，之后发视频不再需要重新授权</li>
+      <li>页面弹出：<strong>「YouTube 频道授权已保存，其他频道授权保持不变」</strong></li>
+      <li>「YouTube 多账号 / 频道管理」显示正确的频道名称、频道 ID 与 <strong>「可选择发布」</strong> 状态</li>
+      <li>访问令牌和刷新令牌会自动保存；刷新令牌失效或授权被撤销时，需要重新授权。</li>
     </ul>
   </div>
-  <p>授权成功后，回「视频发布」页选一个<strong>横屏（宽屏）</strong>视频，勾选「油管 YouTube」即可真实发布。</p>
+  <p>授权成功后，回「视频发布」页选一个<strong>横屏或竖屏</strong>视频，勾选「油管 YouTube」，再选择目标频道，核对名称和频道 ID 后提交。</p>
 
   <h2 id="errors">十、易错点汇总（踩坑大全）</h2>
+  <div class="step-links"><a href="https://console.cloud.google.com/auth/audience?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开目标对象 / 测试用户 ↗</a> <a href="https://console.cloud.google.com/auth/clients?project=shanbo-search-console" target="_blank" rel="noopener noreferrer">打开 OAuth 客户端 / 回调设置 ↗</a> <a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <table>
     <tr><th style="width:26%">坑</th><th>现象 / 原因</th><th style="width:42%">解决办法</th></tr>
     <tr>
       <td><strong>fetch failed</strong></td>
       <td>点授权后报「授权失败：fetch failed」，后端连不上 Google</td>
-      <td>翻墙软件切到「<strong>全局 / TUN 模式</strong>」，让后端也走代理</td>
+      <td>检查后端的代理、DNS 与连接错误；本例使用虚拟网卡和规则模式后成功。也可为 Node 后端显式指定可用代理。</td>
     </tr>
     <tr>
       <td><strong>找不到 External → Create</strong></td>
@@ -301,6 +434,24 @@ Security</code></pre>
     </tr>
   </table>
 
+<section id="publish-playlist" class="card">
+  <p><strong>横屏、竖屏均可发布：</strong>选择“窄屏（竖屏）”后 YouTube 仍可选，单个和批量发布均支持。旧版“仅宽屏”是项目筛选配置的问题，已修正。Shorts 分类由 YouTube 判断，参见<a href="https://support.google.com/youtube/answer/15424877?hl=zh-Hans" target="_blank" rel="noopener">官方说明</a>。</p>
+  <figure><img src="images/youtube-publish-playlists/03-portrait-supported.png" alt="竖屏模式下 YouTube 已可选" style="max-width:100%;height:auto"><figcaption>内部浏览器验证：选择竖屏后可勾选 YouTube，未发布视频。</figcaption></figure>
+
+  <h2>发布视频时选择或新建播放列表（2026-10-09）</h2>
+  <ol>
+    <li>打开<a href="http://localhost:5173/#/publish" target="_blank" rel="noopener">视频发布</a>，选择 YouTube 平台和目标频道。</li>
+    <li>在“所属播放列表”中选择已有列表。留空表示不加入列表；切换频道会自动清空原选择，并加载新频道的列表。批量发布时，所有 YouTube 视频使用同一个列表。</li>
+    <li>需要新列表时点“新建列表”，输入名称并选择私密、不公开或公开，再点“创建并选择”。这一步会立即在所选 YouTube 频道创建列表，即使尚未发布视频，列表也已存在。列表可见范围不改变视频自身可见性。</li>
+    <li>填写视频标题和详情，确认频道及列表后点击发布。任务详情显示所属列表和是否已加入。视频转码完成后加入列表；如果这一步失败，可修复授权或网络后点重试，系统继续处理已上传的视频，不重新上传。</li>
+  </ol>
+  <p><strong>旧账号可能需要重新授权：</strong>创建列表和添加视频需要 <code>youtube.force-ssl</code> 权限。若提示缺少播放列表管理权限，在<a href="http://localhost:5173/#/platform-config" target="_blank" rel="noopener">平台配置 → YouTube 账号管理</a>中对该频道重新授权。必要时在<a href="https://console.cloud.google.com/auth/scopes?project=shanbo-search-console" target="_blank" rel="noopener">Google 数据访问权限</a>添加此范围，再返回应用重新授权。授权完成后重新备份本地私有配置。</p>
+  <p>如果创建请求中断，请先刷新列表确认是否已创建，再决定是否重试，避免重名列表。已经成功发布的视频仍按原规则去重，不能通过再次发布把它移动到另一列表。</p>
+  <figure><img src="images/youtube-publish-playlists/01-select-playlist.png" alt="发布页选择 ShanBo 的已有播放列表" style="max-width:100%;height:auto"><figcaption>实测：发布页读取并选择真实频道的列表。</figcaption></figure>
+  <figure><img src="images/youtube-publish-playlists/02-create-playlist-dialog.png" alt="新建播放列表弹窗及可见范围" style="max-width:100%;height:auto"><figcaption>新建入口实测截图，示例名称未提交。验证未创建线上列表、未发布视频；写入流程通过模拟官方接口测试。</figcaption></figure>
+  <p>官方接口说明：<a href="https://developers.google.com/youtube/v3/docs/playlists/insert" target="_blank" rel="noopener">创建播放列表</a> · <a href="https://developers.google.com/youtube/v3/docs/playlistItems/insert" target="_blank" rel="noopener">将视频加入列表</a>。</p>
+</section>
+
   <h2 id="terms">十一、名词对照表</h2>
   <table>
     <tr><th>我们的系统字段</th><th>Google 的叫法</th><th>说明</th></tr>
@@ -319,7 +470,10 @@ Security</code></pre>
 
 </div>
 
-<footer>油管 YouTube 接入教程 · 含新版界面与全部易错点 · 更新于 2026-08-17</footer>
+<footer>油管 YouTube 接入教程 · 实操截图与网络排错 · 更新于 2026-10-07<p>Google 配置入口参考：<a href="https://developers.google.com/workspace/guides/configure-oauth-consent" target="_blank" rel="noopener noreferrer">官方同意屏幕配置指南</a>。</p></footer>
+
+
+
 
 </body>
 </html>

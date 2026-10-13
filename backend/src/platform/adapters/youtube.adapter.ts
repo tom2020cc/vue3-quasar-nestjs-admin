@@ -13,6 +13,8 @@ import { postForm, readFileBuffer, sleep } from './http.util'
 // 油管频道视频信息（用于「油管视频」栏目）
 export interface YoutubeVideo {
   id: string
+  playlistItemId?: string
+  unavailable?: boolean
   title: string
   description: string
   channelTitle: string
@@ -27,6 +29,18 @@ export interface YoutubeVideo {
   commentCount?: number
 }
 
+export interface YoutubePlaylist {
+  videoIds: string[]
+  id: string
+  title: string
+  description: string
+  thumbnail: string
+  itemCount: number
+  privacyStatus: string
+  publishedAt: string
+  url: string
+}
+
 // 将 YouTube 的 ISO 8601 时长（如 PT1M30S / PT1H2M3S）解析为秒
 function parseIsoDuration(iso: string): number {
   if (!iso) return 0
@@ -35,7 +49,7 @@ function parseIsoDuration(iso: string): number {
   return Number(m[1] || 0) * 3600 + Number(m[2] || 0) * 60 + Number(m[3] || 0)
 }
 
-// 油管 YouTube 适配器（宽屏）
+// 油管 YouTube 适配器（横屏、竖屏共用上传接口）
 // 官方接口：YouTube Data API v3 —— 可恢复上传（resumable upload）
 // 文档：https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol
 @Injectable()
@@ -47,6 +61,27 @@ export class YoutubeAdapter implements IPlatformAdapter {
   // 油管必须有 refreshToken 才算配置完成（发布时再实时换 access_token）
   isConfigured(config: PlatformConfigLike): boolean {
     return !!config.refreshToken
+  }
+
+  async identifyChannelWithToken(accessToken: string): Promise<{ id: string; title: string }> {
+    const response = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', {
+      headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(20000),
+    })
+    const data: any = await response.json()
+    if (!response.ok || data.items?.length !== 1 || !data.items[0].id) {
+      throw new Error('无法唯一识别授权频道，请确认账号已创建频道，并重新选择频道授权')
+    }
+    return { id: data.items[0].id, title: data.items[0].snippet?.title || data.items[0].id }
+  }
+
+  async identifyChannel(config: PlatformConfigLike) {
+    return this.identifyChannelWithToken(await this.refreshAccessToken(config))
+  }
+
+  private async assertTarget(accessToken: string, config: PlatformConfigLike) {
+    if (!config.extra?.expectedChannelId) throw new Error('缺少目标频道，已停止操作')
+    const channel = await this.identifyChannelWithToken(accessToken)
+    if (channel.id !== config.extra.expectedChannelId) throw new Error('授权凭证与目标频道不一致，已停止操作')
   }
 
   async publish(input: PublishVideoInput, config: PlatformConfigLike): Promise<PublishResult> {
@@ -80,6 +115,9 @@ export class YoutubeAdapter implements IPlatformAdapter {
     }
     const accessToken = tokenData.access_token
 
+    // Verify the exact upload token before opening an upload session. Never fall back to another account.
+    await this.assertTarget(accessToken, config)
+
     // 2. 发起可恢复上传，获取上传地址（响应头 Location）
     const metadata = {
       snippet: { title: input.title, description: input.description || '' },
@@ -110,6 +148,7 @@ export class YoutubeAdapter implements IPlatformAdapter {
     })
     const video: any = await upRes.json()
 
+    if (!upRes.ok || !video.id) throw new Error('YouTube 上传未成功，请检查账号权限及配额')
     return {
       success: true,
       pending: true, // 上传完成，仍需等待转码处理
@@ -137,13 +176,16 @@ export class YoutubeAdapter implements IPlatformAdapter {
       return { status: 'processing' as const, message: '获取 access_token 失败' }
     }
     const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=status,processingDetails&id=${externalId}`,
+      `https://www.googleapis.com/youtube/v3/videos?part=snippet,status,processingDetails&id=${encodeURIComponent(externalId)}`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     )
     const data: any = await res.json()
     const item = data?.items?.[0]
     if (!item) {
       return { status: 'processing' as const, message: '视频尚未就绪' }
+    }
+    if (!config.extra?.expectedChannelId || item.snippet?.channelId !== config.extra.expectedChannelId) {
+      return { status: 'failed' as const, message: '视频所属频道与任务目标不一致' }
     }
     const processingStatus = item.processingDetails?.processingStatus
     const uploadStatus = item.status?.uploadStatus
@@ -166,7 +208,7 @@ export class YoutubeAdapter implements IPlatformAdapter {
   // ---- 频道视频列表 ----
 
   // 用 refresh_token 换取 access_token（各接口复用）
-  private async refreshAccessToken(config: PlatformConfigLike): Promise<string> {
+  private async refreshAccessToken(config: PlatformConfigLike, playlistWrite = false): Promise<string> {
     const data = await postForm('https://oauth2.googleapis.com/token', {
       client_id: config.appId!,
       client_secret: config.appSecret!,
@@ -174,9 +216,132 @@ export class YoutubeAdapter implements IPlatformAdapter {
       grant_type: 'refresh_token',
     })
     if (!data.access_token) {
-      throw new Error('获取 access_token 失败：' + JSON.stringify(data))
+      throw new Error('YouTube 授权已失效，请重新授权该频道')
+    }
+    if (playlistWrite && !String(data.scope || '').split(' ').some(scope =>
+      ['https://www.googleapis.com/auth/youtube', 'https://www.googleapis.com/auth/youtube.force-ssl'].includes(scope))) {
+      throw new Error('缺少播放列表管理权限，请到平台配置重新授权此 YouTube 频道后再试')
     }
     return data.access_token
+  }
+
+  private async ownedPlaylist(token: string, config: PlatformConfigLike, playlistId: string) {
+    if (!/^[a-zA-Z0-9_-]{1,150}$/.test(playlistId)) throw new Error('无效的播放列表 ID')
+    const data = await this.youtubeGet(token, 'playlists', { part: 'snippet', id: playlistId })
+    const item = data.items?.[0]
+    if (data.items?.length !== 1 || item.snippet?.channelId !== config.extra?.expectedChannelId) {
+      throw new Error('播放列表不属于所选频道或已不可用，请刷新列表')
+    }
+    return { id: item.id, title: item.snippet.title }
+  }
+
+  async validatePublishPlaylist(config: PlatformConfigLike, playlistId: string) {
+    const token = await this.refreshAccessToken(config, true)
+    await this.assertTarget(token, config)
+    return this.ownedPlaylist(token, config, playlistId)
+  }
+
+  private async youtubePost(token: string, resource: string, part: string, body: unknown) {
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/${resource}?part=${part}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
+    })
+    const data: any = await res.json()
+    if (!res.ok) throw new Error(`YouTube 播放列表操作失败：${data?.error?.message || res.status}`)
+    if (!data.id) throw new Error('YouTube 未返回播放列表操作结果，请刷新后确认')
+    return data
+  }
+
+  async createPlaylist(config: PlatformConfigLike, title: string, privacyStatus: string) {
+    if (!title?.trim() || title.trim().length > 150) throw new Error('列表名称需为 1–150 个字符')
+    if (!['private', 'unlisted', 'public'].includes(privacyStatus)) throw new Error('无效的可见范围')
+    const token = await this.refreshAccessToken(config, true)
+    await this.assertTarget(token, config)
+    const item = await this.youtubePost(token, 'playlists', 'snippet,status', {
+      snippet: { title: title.trim() }, status: { privacyStatus },
+    })
+    return { id: item.id, title: item.snippet?.title || title.trim(), privacyStatus }
+  }
+
+  async addVideoToPlaylist(config: PlatformConfigLike, playlistId: string, videoId: string) {
+    const token = await this.refreshAccessToken(config, true)
+    await this.assertTarget(token, config)
+    await this.ownedPlaylist(token, config, playlistId)
+    const video = await this.youtubeGet(token, 'videos', { part: 'snippet', id: videoId })
+    if (video.items?.length !== 1 || video.items[0].snippet?.channelId !== config.extra?.expectedChannelId) {
+      throw new Error('视频所属频道与任务目标不一致')
+    }
+    // A response may be lost after insertion. Check membership before retrying.
+    const existing = await this.youtubeGet(token, 'playlistItems', { part: 'id', playlistId, videoId, maxResults: '1' })
+    if (existing.items?.length) return
+    await this.youtubePost(token, 'playlistItems', 'snippet', {
+      snippet: { playlistId, resourceId: { kind: 'youtube#video', videoId } },
+    })
+  }
+
+  private async youtubeGet(accessToken: string, resource: string, params: Record<string, string>) {
+    const response = await fetch(`https://www.googleapis.com/youtube/v3/${resource}?${new URLSearchParams(params)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(30000),
+    })
+    const data: any = await response.json()
+    if (!response.ok) throw new Error(`获取 YouTube 数据失败：${data?.error?.message || response.status}`)
+    return data
+  }
+
+  async listChannelPlaylists(config: PlatformConfigLike, summaryOnly = false): Promise<YoutubePlaylist[]> {
+    const token = await this.refreshAccessToken(config)
+    await this.assertTarget(token, config)
+    const result: (YoutubePlaylist & { coverUrl: string })[] = []
+    let pageToken = ''
+    do {
+      const data = await this.youtubeGet(token, 'playlists', {
+        part: 'snippet,contentDetails,status', mine: 'true', maxResults: '50',
+        ...(pageToken ? { pageToken } : {}),
+      })
+      for (const item of data.items || []) {
+        if (item.snippet?.channelId !== config.extra.expectedChannelId) throw new Error('播放列表与所选频道不一致')
+        const t = item.snippet?.thumbnails || {}
+        result.push({ id: item.id, title: item.snippet?.title || '未命名播放列表',
+          description: item.snippet?.description || '',
+          thumbnail: '', videoIds: [], coverUrl: t.medium?.url || t.high?.url || t.default?.url || '',
+          itemCount: item.contentDetails?.itemCount || 0, privacyStatus: item.status?.privacyStatus || '',
+          publishedAt: item.snippet?.publishedAt || '', url: `https://www.youtube.com/playlist?list=${encodeURIComponent(item.id)}` })
+      }
+      pageToken = data.nextPageToken || ''
+    } while (pageToken)
+    if (summaryOnly) return result.map(({ coverUrl, ...playlist }) => playlist)
+    // Read membership IDs without downloading every video's details or thumbnail.
+    // Bound concurrency so large channels do not create a burst of API requests.
+    let cursor = 0
+    await Promise.all(Array.from({ length: Math.min(4, result.length) }, async () => {
+      while (cursor < result.length) {
+        const playlist = result[cursor++]
+        const ids = new Set<string>()
+        let next = ''
+        do {
+          const page = await this.youtubeGet(token, 'playlistItems', {
+            part: 'contentDetails', playlistId: playlist.id, maxResults: '50',
+            ...(next ? { pageToken: next } : {}),
+          })
+          for (const item of page.items || []) if (item.contentDetails?.videoId) ids.add(item.contentDetails.videoId)
+          next = page.nextPageToken || ''
+        } while (next)
+        playlist.videoIds = [...ids]
+        playlist.thumbnail = await this.thumbnailToBase64(playlist.coverUrl)
+      }
+    }))
+    return result.map(({ coverUrl, ...playlist }) => playlist)
+  }
+
+  async listPlaylistVideos(config: PlatformConfigLike, playlistId: string): Promise<YoutubeVideo[]> {
+    if (typeof playlistId !== 'string' || !/^[a-zA-Z0-9_-]{1,150}$/.test(playlistId)) throw new Error('无效的播放列表 ID')
+    const token = await this.refreshAccessToken(config)
+    await this.assertTarget(token, config)
+    const data = await this.youtubeGet(token, 'playlists', { part: 'snippet', id: playlistId })
+    if (data.items?.length !== 1 || data.items[0].snippet?.channelId !== config.extra.expectedChannelId) {
+      throw new Error('播放列表不属于所选频道或已不可用，请刷新列表')
+    }
+    return this.readPlaylistVideos(token, playlistId)
   }
 
   // 获取当前授权账号频道下的所有视频信息
@@ -192,19 +357,27 @@ export class YoutubeAdapter implements IPlatformAdapter {
     if (!chRes.ok) {
       throw new Error(`获取频道信息失败：${chData?.error?.message || chRes.status}`)
     }
+    if (!config.extra?.expectedChannelId || chData.items?.length !== 1 || chData.items[0].id !== config.extra.expectedChannelId) {
+      throw new Error('授权频道与所选频道不一致，请重新授权')
+    }
     const uploadsPlaylist = chData?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads
     if (!uploadsPlaylist) {
       throw new Error('未找到频道「上传」播放列表，请确认该账号已创建频道')
     }
 
-    // 2. 翻页拉取上传列表（每页 50 条，带安全上限）
+    return this.readPlaylistVideos(accessToken, uploadsPlaylist)
+  }
+
+  private async readPlaylistVideos(accessToken: string, playlistId: string): Promise<YoutubeVideo[]> {
+    // Preserve playlist order, including repeated videos and unavailable entries.
+
     const items: any[] = []
     let pageToken: string | undefined
     const MAX_PAGES = 100
     for (let i = 0; i < MAX_PAGES; i++) {
       const params = new URLSearchParams({
         part: 'snippet,contentDetails',
-        playlistId: uploadsPlaylist,
+        playlistId,
         maxResults: '50',
       })
       if (pageToken) params.set('pageToken', pageToken)
@@ -219,6 +392,7 @@ export class YoutubeAdapter implements IPlatformAdapter {
       items.push(...(plData.items || []))
       pageToken = plData.nextPageToken
       if (!pageToken) break
+      if (i === MAX_PAGES - 1) throw new Error('播放列表超过 5000 条，暂无法完整读取')
     }
 
     // 3. 按 50 个一批补齐统计与时长信息
@@ -231,7 +405,8 @@ export class YoutubeAdapter implements IPlatformAdapter {
         { headers: { Authorization: `Bearer ${accessToken}` } },
       )
       const vData: any = await vRes.json()
-      if (vRes.ok && vData.items) {
+      if (!vRes.ok) throw new Error(`获取视频详情失败：${vData?.error?.message || vRes.status}`)
+      if (vData.items) {
         for (const v of vData.items) statsMap[v.id] = v
       }
     }
@@ -248,6 +423,8 @@ export class YoutubeAdapter implements IPlatformAdapter {
         t.maxres?.url || t.standard?.url || t.high?.url || t.medium?.url || t.default?.url || ''
       return {
         id,
+        playlistItemId: it.id,
+        unavailable: !statsMap[id],
         title: vsnippet.title || psnippet.title || '',
         description: vsnippet.description || psnippet.description || '',
         channelTitle: vsnippet.channelTitle || psnippet.channelTitle || '',
@@ -276,7 +453,7 @@ export class YoutubeAdapter implements IPlatformAdapter {
   private async thumbnailToBase64(url: string): Promise<string> {
     if (!url) return ''
     try {
-      const res = await fetch(url)
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
       if (!res.ok) return ''
       const buf = Buffer.from(await res.arrayBuffer())
       return `data:image/jpeg;base64,${buf.toString('base64')}`
@@ -297,9 +474,9 @@ export class YoutubeAdapter implements IPlatformAdapter {
       client_id: config.appId!,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
+      scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl',
       access_type: 'offline', // 必须，用于换取 refresh_token
-      prompt: 'consent',
+      prompt: 'consent select_account',
       include_granted_scopes: 'true',
       state,
     })

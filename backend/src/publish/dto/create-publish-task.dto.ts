@@ -1,12 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { TIKTOK_PRIVACY_LEVELS } from '../../platform/adapters/tiktok-privacy'
 import { Type } from 'class-transformer'
 import {
   ArrayMinSize,
   IsArray,
+  IsUUID,
   IsIn,
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   ValidateNested,
 } from 'class-validator'
 
@@ -55,6 +58,24 @@ export class CreatePublishTaskDto {
   @IsString()
   cover?: string
 
+  @ApiPropertyOptional({ description: 'YouTube 账号 ID；选择 YouTube 平台时必须提供' })
+  @IsOptional()
+  @IsString()
+  youtubeAccountId?: string
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-zA-Z0-9_-]{1,150}$/)
+  youtubePlaylistId?: string
+
+  @IsOptional()
+  @IsUUID()
+  tiktokAccountId?: string
+
+  @IsOptional()
+  @IsIn(TIKTOK_PRIVACY_LEVELS)
+  tiktokPrivacyLevel?: string
+
   @ApiProperty({
     description: '目标平台编码数组',
     example: ['douyin_cn', 'youtube'],
@@ -62,6 +83,12 @@ export class CreatePublishTaskDto {
   })
   @IsArray()
   platforms: string[]
+}
+
+export class RetryPublishDto {
+  @IsOptional()
+  @IsIn(TIKTOK_PRIVACY_LEVELS)
+  tiktokPrivacyLevel?: string
 }
 
 // 批量发布请求体：一次提交多个视频的发布任务（逐项校验、逐项错误隔离）

@@ -8,6 +8,7 @@ import { mkdirSync } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.useBodyParser('json', { limit: '1mb' });
   app.useGlobalPipes(new ValidationPipe({whitelist:true, transform:true}));//管道配置字段检查 + 类型转换（配合 @ValidateNested 校验批量嵌套 DTO）
   app.enableCors();//允许跨域
 

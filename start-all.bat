@@ -15,7 +15,7 @@ echo   Starting backend (port 5001) and
 echo   frontend (port 5173) in new windows...
 echo ================================================
 
-start "Backend (5001)" /D "%~dp0backend" cmd /k "pnpm start:dev"
+start "Backend (5001)" /D "%~dp0backend" cmd /k "node scripts/start-configured.cjs --watch"
 start "Frontend (5173)" /D "%~dp0frontend" cmd /k "pnpm dev"
 
 echo.

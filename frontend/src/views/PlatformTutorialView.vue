@@ -52,6 +52,7 @@ import { ref, computed } from 'vue'
 import PlatformGuideCard from '@/components/PlatformGuideCard.vue'
 
 const tabs = [
+  { code: 'video-upload', name: '上传与续传', icon: 'cloud_upload' },
   { code: 'douyin', name: '国产抖音', icon: 'music_note' },
   { code: 'youtube', name: '油管 YouTube', icon: 'smart_display' },
   { code: 'tiktok', name: 'TikTok', icon: 'music_video' },

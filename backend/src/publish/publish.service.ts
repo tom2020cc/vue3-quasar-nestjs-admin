@@ -1,3 +1,5 @@
+import { TiktokAccountService } from '../platform/tiktok-account.service'
+import { YoutubeAdapter } from '../platform/adapters/youtube.adapter'
 import {
   BadRequestException,
   Injectable,
@@ -15,7 +17,8 @@ import { CreatePublishTaskDto } from './dto/create-publish-task.dto'
 import { PlatformConfigService } from '../platform/platform-config.service'
 import { PlatformAdapterFactory } from '../platform/adapters/platform-adapter.factory'
 import { S3StorageService } from '../platform/storage/s3-storage.service'
-import { Orientation } from '../platform/adapters/platform.interface'
+import { Orientation, PlatformConfigLike } from '../platform/adapters/platform.interface'
+import { YoutubeAccountService } from '../platform/youtube-account.service'
 import { VideoLibraryService } from '../video-library/video-library.service'
 
 @Injectable()
@@ -29,10 +32,22 @@ export class PublishService implements OnApplicationBootstrap {
     private readonly factory: PlatformAdapterFactory,
     private readonly videoLibraryService: VideoLibraryService,
     private readonly storage: S3StorageService,
+    private readonly youtubeAccounts: YoutubeAccountService,
+    private readonly tiktokAccounts: TiktokAccountService,
   ) {}
 
   // 启动时把历史发布任务回填到视频库（幂等，按哈希去重），让旧数据立即可见
   async onApplicationBootstrap() {
+    // A saved TikTok session survives a backend restart; never restart its upload blindly.
+    const interrupted = await this.recordRepo.find({ where: { platform: 'tiktok', status: 'publishing', mock: false } })
+    for (const record of interrupted) {
+      record.status = 'failed'
+      record.message = record.externalId
+        ? '后端重启导致上传中断，上传编号已保留；请检查平台状态，勿重复上传'
+        : '后端重启导致发布中断，未记录上传编号；请先核对 TikTok 账号中的视频，再决定是否重试'
+      await this.recordRepo.save(record)
+      await this.updateTaskStatus(record.taskId)
+    }
     const tasks = await this.taskRepo.find({ order: { id: 'ASC' } })
     for (const t of tasks) {
       try {
@@ -69,12 +84,13 @@ export class PublishService implements OnApplicationBootstrap {
       const item = items[i]
       try {
         // 批内去重：同一内容哈希本次批次只发布一次，避免重复提交
-        if (item.videoHash && seenHashes.has(item.videoHash)) {
+        const batchKey = `${item.videoHash}:${[...item.platforms].sort().join(',')}:${item.youtubeAccountId || ''}:${item.tiktokAccountId || ''}`
+        if (item.videoHash && seenHashes.has(batchKey)) {
           results.push({ index: i, ok: false, message: '批内重复：与前面某项内容相同，已跳过' })
           continue
         }
-        if (item.videoHash) seenHashes.add(item.videoHash)
         const task = await this.createOne(item)
+        if (item.videoHash) seenHashes.add(batchKey)
         results.push({ index: i, ok: true, taskId: task.id })
       } catch (e: any) {
         results.push({ index: i, ok: false, message: e?.message || '创建失败' })
@@ -92,6 +108,7 @@ export class PublishService implements OnApplicationBootstrap {
 
   // 单个任务核心逻辑：校验平台/尺寸 → 落库 → 去重 → 入库 → 异步触发发布（不阻塞接口返回）
   private async createOne(dto: CreatePublishTaskDto): Promise<PublishTask> {
+    if (dto.platforms?.includes('tiktok')) throw new BadRequestException('TikTok 已改为官方网页发布，请使用 TikTok 网页发布入口；单个和批量 API 发布均已停用')
     const { orientation } = dto
     // 文件名做 basename 归一化，防止 ../../ 路径穿越引用到 uploads 目录之外的文件
     const videoFilename = basename(dto.videoFilename || '')
@@ -128,6 +145,24 @@ export class PublishService implements OnApplicationBootstrap {
       if (!checked.includes(code)) checked.push(code)
     }
 
+    const youtubeAccount = checked.includes('youtube') ? await this.youtubeAccounts.resolve(dto.youtubeAccountId) : null
+    if (youtubeAccount && !(await this.configService.findByCode('youtube'))?.enabled) {
+      throw new BadRequestException('YouTube 平台已停用')
+    }
+    let youtubePlaylist: { id: string; title: string } | null = null
+    if (dto.youtubePlaylistId) {
+      if (!youtubeAccount) throw new BadRequestException('请选择 YouTube 频道后再选择列表')
+      try {
+        youtubePlaylist = await (this.factory.get('youtube') as YoutubeAdapter).validatePublishPlaylist(
+          this.youtubeAccounts.config(youtubeAccount), dto.youtubePlaylistId)
+      } catch (e: any) { throw new BadRequestException(e.message || '播放列表校验失败') }
+    }
+
+    const tiktokAccount = checked.includes('tiktok') ? await this.tiktokAccounts.resolve(dto.tiktokAccountId) : null
+    if (tiktokAccount && !(await this.configService.findByCode('tiktok'))?.enabled) throw new BadRequestException('TikTok 平台已停用')
+
+    if (tiktokAccount && !dto.tiktokPrivacyLevel) throw new BadRequestException('请选择 TikTok 可见性')
+
     // 3. 计算内容哈希（优先前端传入，否则流式计算兜底），并记录元数据
     const size = statSync(videoPath).size
     let videoHash = dto.videoHash || null
@@ -156,12 +191,21 @@ export class PublishService implements OnApplicationBootstrap {
     const publishedPlatforms = await this.findPublishedPlatforms(videoHash)
     const records: PublishRecord[] = []
     for (const code of checked) {
-      const dupTaskId = publishedPlatforms.get(code)
+      const target = code === 'youtube' ? {
+        youtubeAccountId: youtubeAccount.id,
+        targetChannelId: youtubeAccount.channelId,
+        targetChannelTitle: youtubeAccount.channelTitle,
+        youtubePlaylistId: youtubePlaylist?.id || null,
+        youtubePlaylistTitle: youtubePlaylist?.title || null,
+      } : code === 'tiktok' ? { tiktokPrivacyLevel: dto.tiktokPrivacyLevel, tiktokAccountId: tiktokAccount.id, targetTiktokOpenId: tiktokAccount.openId,
+        targetTiktokAppId: tiktokAccount.appId, targetTiktokName: tiktokAccount.displayName || tiktokAccount.label } : {}
+      const dupTaskId = publishedPlatforms.get(code === 'youtube' ? `youtube:${youtubeAccount.channelId}` : code === 'tiktok' ? `tiktok:${tiktokAccount.appId}:${tiktokAccount.openId}` : code)
       if (dupTaskId) {
         const name = this.factory.get(code)?.meta?.name || code
         records.push(
           this.recordRepo.create({
             taskId: task.id,
+            ...target,
             platform: code,
             status: 'skipped',
             duplicate: true,
@@ -169,7 +213,7 @@ export class PublishService implements OnApplicationBootstrap {
           }),
         )
       } else {
-        records.push(this.recordRepo.create({ taskId: task.id, platform: code, status: 'pending' }))
+        records.push(this.recordRepo.create({ taskId: task.id, platform: code, status: 'pending', ...target }))
       }
     }
     await this.recordRepo.save(records)
@@ -241,6 +285,12 @@ export class PublishService implements OnApplicationBootstrap {
   private async publishOne(task: PublishTask, record: PublishRecord) {
     // 已跳过（去重等）或已结束的记录不再处理
     if (record.status !== 'pending') return
+    if (record.platform === 'tiktok') {
+      record.status = 'failed'
+      record.message = 'TikTok API 发布已停用，请先在官方网页核对已有视频，再从 TikTok 网页发布入口操作'
+      await this.recordRepo.save(record)
+      return
+    }
 
     const adapter = this.factory.get(record.platform)
     if (!adapter) {
@@ -250,7 +300,14 @@ export class PublishService implements OnApplicationBootstrap {
       return
     }
 
-    let config = await this.configService.findByCode(record.platform)
+    let config: PlatformConfigLike
+    try { config = await this.resolveRecordConfig(record, true) }
+    catch (e: any) {
+      record.status = 'failed'
+      record.message = e.message || '目标账号不可用'
+      await this.recordRepo.save(record)
+      return
+    }
     if (!config || !config.enabled) {
       record.status = 'skipped'
       record.message = '平台未配置或未启用，已跳过'
@@ -258,8 +315,26 @@ export class PublishService implements OnApplicationBootstrap {
       return
     }
 
+    // Once YouTube has returned a video ID, retries resume status/playlist work only.
+    if (record.platform === 'youtube' && record.externalId && !record.mock) {
+      record.status = 'processing'
+      record.pollCount = 0
+      record.message = '继续检查已上传视频及所属列表，不重复上传'
+      await this.recordRepo.save(record)
+      return
+    }
+    if (record.platform === 'youtube' && record.youtubePlaylistId) {
+      try { await (adapter as YoutubeAdapter).validatePublishPlaylist(config, record.youtubePlaylistId) }
+      catch (e: any) {
+        record.status = 'failed'
+        record.message = e.message || '播放列表校验失败'
+        await this.recordRepo.save(record)
+        return
+      }
+    }
+
     // 访问令牌临近/已经过期时，若该平台支持刷新则自动刷新并持久化（如 TikTok 的 24h 短期 token）
-    if (adapter.refresh && this.shouldRefreshToken(config)) {
+    if (!['youtube', 'tiktok'].includes(record.platform) && adapter.refresh && this.shouldRefreshToken(config)) {
       try {
         const tokens = await adapter.refresh(config)
         await this.configService.saveTokens(config.code, tokens)
@@ -288,17 +363,24 @@ export class PublishService implements OnApplicationBootstrap {
           orientation: task.orientation as Orientation,
           title: task.title,
           description: task.description,
+          duration: task.duration,
+          tiktokPrivacyLevel: record.tiktokPrivacyLevel,
+          onUploadSession: record.platform === 'tiktok' ? async externalId => {
+            record.externalId = externalId
+            record.message = 'TikTok 上传会话已建立，正在传输视频'
+            await this.recordRepo.save(record)
+          } : undefined,
           publicUrl,
         },
         config,
       )
       record.message = result.message || ''
-      record.externalId = result.externalId || null
+      record.externalId = result.externalId || record.externalId || null
       record.externalUrl = result.externalUrl || null
       record.mock = !!result.mock
       if (!result.success) {
         record.status = 'failed'
-      } else if (result.pending) {
+      } else if (result.pending || (record.platform === 'youtube' && !!record.youtubePlaylistId)) {
         // 已提交但仍在平台处理中（转码/审核），交由轮询服务查询最终状态
         record.status = 'processing'
         record.pollCount = 0
@@ -313,12 +395,37 @@ export class PublishService implements OnApplicationBootstrap {
     await this.recordRepo.save(record)
   }
 
+  async completeYoutubePlaylist(record: PublishRecord, config: PlatformConfigLike) {
+    if (record.platform !== 'youtube' || !record.youtubePlaylistId || record.youtubePlaylistAdded || record.mock) return
+    await (this.factory.get('youtube') as YoutubeAdapter).addVideoToPlaylist(config, record.youtubePlaylistId, record.externalId)
+    record.youtubePlaylistAdded = true
+  }
+
+  async resolveRecordConfig(record: PublishRecord, publishing = false): Promise<PlatformConfigLike> {
+    const platform = await this.configService.findByCode(record.platform)
+    if (record.platform === 'tiktok') {
+      if (!record.tiktokAccountId || !record.targetTiktokOpenId || !record.targetTiktokAppId) throw new BadRequestException('旧任务未绑定 TikTok 账号，请选择账号后新建任务')
+      const config = await this.tiktokAccounts.readyConfig(record.tiktokAccountId, record.targetTiktokOpenId, record.targetTiktokAppId, publishing)
+      return { ...config, enabled: !!platform?.enabled && config.enabled }
+    }
+    if (record.platform !== 'youtube') return platform
+    if (!record.youtubeAccountId || !record.targetChannelId) {
+      throw new BadRequestException('旧任务未绑定 YouTube 频道，请选择频道后新建任务')
+    }
+    const account = await this.youtubeAccounts.resolve(record.youtubeAccountId, record.targetChannelId)
+    return { ...this.youtubeAccounts.config(account), enabled: !!platform?.enabled && account.enabled }
+  }
+
   // 判断是否需要自动刷新访问令牌：有 refreshToken 且 token 已过期或 5 分钟内即将过期
   private shouldRefreshToken(config: {
+    code?: string
+    accessToken?: string | null
+    extra?: Record<string, any> | null
     refreshToken?: string | null
     tokenExpiresAt?: Date | null
   }): boolean {
-    if (!config.refreshToken || !config.tokenExpiresAt) return false
+    const canRefresh = config.code === 'instagram' ? config.accessToken && config.extra?.authType === 'instagram_login' : config.refreshToken
+    if (!canRefresh || !config.tokenExpiresAt) return false
     return config.tokenExpiresAt.getTime() - Date.now() < 5 * 60 * 1000
   }
 
@@ -330,12 +437,17 @@ export class PublishService implements OnApplicationBootstrap {
       .createQueryBuilder('task')
       .innerJoin(PublishRecord, 'record', 'record.taskId = task.id')
       .select('record.platform', 'platform')
+      .addSelect('record.targetChannelId', 'targetChannelId')
+      .addSelect('record.targetTiktokOpenId', 'targetTiktokOpenId')
+      .addSelect('record.targetTiktokAppId', 'targetTiktokAppId')
       .addSelect('task.id', 'taskId')
       .where('record.status = :status', { status: 'success' })
+      .andWhere('record.mock = :mock', { mock: false })
       .andWhere('task.videoHash = :hash', { hash: videoHash })
       .getRawMany()
     for (const r of rows) {
-      if (!map.has(r.platform)) map.set(r.platform, Number(r.taskId))
+      const key = r.platform === 'youtube' ? `youtube:${r.targetChannelId}` : r.platform === 'tiktok' ? `tiktok:${r.targetTiktokAppId}:${r.targetTiktokOpenId}` : r.platform
+      if (!map.has(key)) map.set(key, Number(r.taskId))
     }
     return map
   }
@@ -384,16 +496,38 @@ export class PublishService implements OnApplicationBootstrap {
     return { ...task, records }
   }
 
+  // Only reconcile failed records; active uploads and automatic polling own their records.
+  async checkTiktokStatus(id: number) {
+    const task = await this.findOne(id)
+    const record = task.records.find(r => r.platform === 'tiktok' && r.externalId && !r.mock)
+    if (!record) throw new BadRequestException('尚未获得 TikTok 上传编号，请查看失败原因')
+    if (record.status !== 'failed') throw new BadRequestException('仅需检查已中断或超时的任务；运行中的任务会自动更新')
+    const config = await this.resolveRecordConfig(record)
+    let result
+    try {
+      result = await this.factory.get('tiktok').queryStatus({ externalId: record.externalId, config, pollCount: record.pollCount })
+    } catch (e: any) { throw new BadRequestException(e.message || 'TikTok 状态检查失败，请稍后重试') }
+    // A concurrent check may already have resumed polling; do not overwrite its newer result.
+    const changes = await this.recordRepo.update({ id: record.id, status: 'failed', externalId: record.externalId }, {
+      status: result.status, message: result.message || '', pollCount: 0,
+      externalUrl: result.externalUrl || record.externalUrl,
+      publishedAt: result.status === 'success' ? new Date() : record.publishedAt,
+    })
+    if (changes.affected) await this.updateTaskStatus(id)
+    return this.findOne(id)
+  }
+
   // 重试：重新执行失败/跳过的平台
-  async retry(id: number) {
+  async retry(id: number, tiktokPrivacyLevel?: string) {
     const task = await this.taskRepo.findOne({ where: { id } })
     if (!task) {
       throw new NotFoundException('未找到该发布任务')
     }
     const records = await this.recordRepo.find({ where: { taskId: id } })
-    const toRetry = records.filter((r) => r.status === 'failed' || (r.status === 'skipped' && !r.duplicate))
+    if (records.some(r => ['pending', 'publishing', 'processing'].includes(r.status))) throw new BadRequestException('任务仍在处理中，请等待完成后重试')
+    const toRetry = records.filter((r) => r.platform !== 'tiktok' && (r.status === 'failed' || (r.status === 'skipped' && !r.duplicate)))
     if (toRetry.length === 0) {
-      return { msg: '没有可重试的平台' }
+      throw new BadRequestException('没有可重试的平台；TikTok 已停用 API 重试，请使用 TikTok 网页发布入口')
     }
     for (const r of toRetry) {
       r.status = 'pending'

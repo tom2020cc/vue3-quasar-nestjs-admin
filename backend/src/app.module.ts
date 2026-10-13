@@ -11,6 +11,7 @@ import { PlatformModule } from './platform/platform.module';
 import { VideoUploadModule } from './video-upload/video-upload.module';
 import { PublishModule } from './publish/publish.module';
 import { VideoLibraryModule } from './video-library/video-library.module';
+import { BrowserPublishModule } from './browser-publish/browser-publish.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { VideoLibraryModule } from './video-library/video-library.module';
     VideoUploadModule,
     PublishModule,
     VideoLibraryModule,
+    BrowserPublishModule,
   ],
   controllers: [AppController],
   providers: [AppService],

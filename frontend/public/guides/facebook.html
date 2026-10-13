@@ -36,6 +36,11 @@
   .toc a { color:var(--blue); text-decoration:none; }
   .toc a:hover { text-decoration:underline; }
   footer { text-align:center; color:#9ca3af; font-size:13px; padding:24px; }
+
+  .step-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 18px; }
+  .step-links a { display: inline-block; padding: 7px 12px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; color: #1d4ed8; text-decoration: none; font-size: 14px; }
+  .step-links a:hover { background: #dbeafe; text-decoration: underline; }
+  .step-links span { flex-basis: 100%; color: #64748b; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -72,6 +77,7 @@
   <div class="tip">Facebook 直接上传视频二进制，<strong>不需要对象存储</strong>（与 Instagram 不同）。</div>
 
   <h2 id="account">二、第 1 步：注册 Meta 开发者 &amp; 创建 App</h2>
+  <div class="step-links"><a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer">Meta 开发者平台 ↗</a></div>
   <ol>
     <li>打开 <a href="https://developers.facebook.com" target="_blank">Meta for Developers</a>，用你的 Facebook 账号登录。</li>
     <li>进入「我的应用 → 创建应用」，应用类型选择 <strong>Business（商务）</strong>。</li>
@@ -84,12 +90,14 @@
   </ol>
 
   <h2 id="product">三、第 2 步：添加 Facebook Login for Business</h2>
+  <div class="step-links"><a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer">Meta 开发者平台 ↗</a><span>打开后选择自己的应用，再按下方步骤操作。</span></div>
   <ol>
     <li>在应用里点「添加产品」，选择 <strong>Facebook Login（登录）</strong>。</li>
     <li>勾选 <strong>Facebook Login for Business</strong> 的「配置」。</li>
   </ol>
 
   <h2 id="scope">四、第 3 步：申请页面发布权限</h2>
+  <div class="step-links"><a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer">Meta 开发者平台 ↗</a><span>打开后选择自己的应用，再按下方步骤操作。</span></div>
   <p>在「应用审核 → 权限和功能」中申请（Development Mode 下默认可直接使用）：</p>
   <ul>
     <li><code>pages_show_list</code> —— 读取你的 Page 列表</li>
@@ -98,18 +106,21 @@
   </ul>
 
   <h2 id="callback">五、第 4 步：配置回调地址</h2>
+  <div class="step-links"><a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer">Meta 开发者平台 ↗</a><span>打开后选择自己的应用，再按下方步骤操作。</span></div>
   <p>在「Facebook Login → 设置」中，把下面地址加到 <strong>有效的 OAuth 跳转 URI</strong>：</p>
   <pre><code>http://localhost:5001/platform/facebook/oauth/callback</code></pre>
 
   <h2 id="asset">六、第 5 步：准备 Facebook Page</h2>
+  <div class="step-links"><a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer">打开 Facebook ↗</a></div>
   <ol>
     <li>确保你的 Facebook 账号名下有一个 <strong>Page（公共主页）</strong>，没有就先创建一个。</li>
     <li>你必须是该 Page 的 <strong>管理员</strong>，否则授权时拿不到该 Page。</li>
   </ol>
 
   <h2 id="fill">七、第 6 步：填进系统「平台配置」页</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <ol>
-    <li>打开系统「平台配置」页：<code>http://localhost:5173/#/platform-config</code>（登录 <code>admin@qq.com / admin123</code>）。</li>
+    <li>打开系统「平台配置」页：<a href="/#/platform-config" target="_blank" rel="noopener noreferrer">本地平台配置页面 ↗</a>（登录 <code>admin@qq.com / admin123</code>）。</li>
     <li>找到「Facebook」行，点「配置」，填：
       <ul>
         <li><strong>应用ID</strong> ← App ID</li>
@@ -120,6 +131,7 @@
   </ol>
 
   <h2 id="auth">八、第 7 步：点「授权」拿到 Page Token</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <ol>
     <li>Facebook 行点「授权」，跳转 Meta 登录授权页。</li>
     <li>选择你的 Page，同意授权。</li>
@@ -127,6 +139,7 @@
   </ol>
 
   <h2 id="success">九、成功标志</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a> <a href="/#/publish" target="_blank" rel="noopener noreferrer">打开视频发布 ↗</a></div>
   <div class="card">
     <ul style="margin:0">
       <li>页面弹出「Facebook 授权成功，令牌已保存」</li>
@@ -136,6 +149,7 @@
   </div>
 
   <h2 id="errors">十、易错点汇总</h2>
+  <div class="step-links"><a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer">Meta 开发者平台 ↗</a> <a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <table>
     <tr><th style="width:26%">坑</th><th>现象 / 原因</th><th style="width:42%">解决办法</th></tr>
     <tr><td><strong>报 #100 无权限</strong></td><td>用了用户 token 而不是 Page token</td><td>确认授权时选了 Page，且拿到的是 Page Token</td></tr>

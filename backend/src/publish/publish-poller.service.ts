@@ -119,6 +119,7 @@ export class PublishPollerService implements OnApplicationBootstrap, OnApplicati
     if (record.pollCount > this.maxAttempts) {
       record.status = 'failed'
       record.message = `轮询超时（已轮询 ${this.maxAttempts} 次，仍未完成）`
+      if (record.platform === 'tiktok') record.message += '；尚未确认平台发布结果，请稍后点击“检查平台状态”，不要重复上传'
       await this.recordRepo.save(record)
       return
     }
@@ -131,7 +132,14 @@ export class PublishPollerService implements OnApplicationBootstrap, OnApplicati
       return
     }
 
-    const config = await this.configService.findByCode(record.platform)
+    let config
+    try { config = await this.publishService.resolveRecordConfig(record) }
+    catch (e: any) {
+      record.status = 'failed'
+      record.message = e.message || '任务目标账号不可用'
+      await this.recordRepo.save(record)
+      return
+    }
     if (!config) {
       record.status = 'failed'
       record.message = '平台配置不存在'
@@ -146,6 +154,13 @@ export class PublishPollerService implements OnApplicationBootstrap, OnApplicati
         pollCount: record.pollCount,
       })
       if (result.status === 'success') {
+        try { await this.publishService.completeYoutubePlaylist(record, config) }
+        catch (e: any) {
+          record.status = 'failed'
+          record.message = `视频已上传，加入列表失败：${e.message}。重试会继续处理此视频，不重复上传。`
+          await this.recordRepo.save(record)
+          return
+        }
         record.status = 'success'
         record.publishedAt = new Date()
         if (result.externalUrl) record.externalUrl = result.externalUrl
@@ -153,6 +168,7 @@ export class PublishPollerService implements OnApplicationBootstrap, OnApplicati
         record.status = 'failed'
       }
       if (result.message) record.message = result.message
+      if (record.status === 'success' && record.youtubePlaylistAdded) record.message += `，已加入列表「${record.youtubePlaylistTitle}」`
     } catch (e: any) {
       // 单次查询失败不改变状态，保留原 message，下一轮继续
       record.message = `状态查询异常：${e.message}`

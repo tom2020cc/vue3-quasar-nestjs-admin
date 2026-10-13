@@ -16,7 +16,7 @@ export enum Orientation {
 // 平台编码（唯一标识，对应 platform_config 表中的 code 字段）
 export enum PlatformCode {
   DOUYIN_CN = 'douyin_cn', // 国产抖音（宽屏、窄屏均支持）
-  YOUTUBE = 'youtube', // 油管 YouTube（宽屏）
+  YOUTUBE = 'youtube', // 油管 YouTube（横屏、竖屏）
   TIKTOK = 'tiktok', // 抖音海外版 TikTok（窄屏）
   KUAISHOU = 'kuaishou', // 快手（窄屏）
   FACEBOOK = 'facebook', // Facebook Page（横屏、竖屏均支持）
@@ -49,7 +49,7 @@ export const PLATFORMS: PlatformMeta[] = [
   {
     code: PlatformCode.YOUTUBE,
     name: '油管 YouTube',
-    orientations: [Orientation.LANDSCAPE],
+    orientations: [Orientation.LANDSCAPE, Orientation.PORTRAIT],
     description: 'YouTube Data API v3（OAuth2 授权、可恢复上传）',
     apiBase: 'https://www.googleapis.com',
     requiredFields: ['appId(client_id)', 'appSecret(client_secret)', 'refreshToken'],
@@ -87,9 +87,9 @@ export const PLATFORMS: PlatformMeta[] = [
     code: PlatformCode.INSTAGRAM,
     name: 'Instagram',
     orientations: [Orientation.PORTRAIT],
-    description: 'Instagram Content Publishing API（需 Business 账号 + 对象存储托管视频）',
-    apiBase: 'https://graph.facebook.com',
-    requiredFields: ['appId(client_id)', 'appSecret(client_secret)', 'accessToken', 'videoUrl'],
+    description: 'Instagram 直接授权（创作者 / 企业账号，无需绑定 FB 主页；当前视频上传需对象存储）',
+    apiBase: 'https://graph.instagram.com',
+    requiredFields: ['Instagram App ID', 'Instagram App Secret', '授权后自动保存账号和令牌', '视频对象存储'],
     available: true,
   },
 ]
@@ -103,6 +103,9 @@ export interface PublishVideoInput {
   orientation: Orientation
   title: string
   description?: string
+  tiktokPrivacyLevel?: string
+  onUploadSession?: (externalId: string) => Promise<void>
+  duration?: number
   coverUrl?: string
   publicUrl?: string // 公网可访问的视频 URL（Instagram 等平台需要，由对象存储托管后回填）
 }

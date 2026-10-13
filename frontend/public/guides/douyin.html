@@ -36,6 +36,11 @@
   .toc a { color:var(--blue); text-decoration:none; }
   .toc a:hover { text-decoration:underline; }
   footer { text-align:center; color:#9ca3af; font-size:13px; padding:24px; }
+
+  .step-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 18px; }
+  .step-links a { display: inline-block; padding: 7px 12px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; color: #1d4ed8; text-decoration: none; font-size: 14px; }
+  .step-links a:hover { background: #dbeafe; text-decoration: underline; }
+  .step-links span { flex-basis: 100%; color: #64748b; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -67,6 +72,7 @@
   <div class="tip">抖音是国内平台，<strong>不需要翻墙</strong>，整个流程都可以直接访问。</div>
 
   <h2 id="account">二、第 1 步：注册开发者账号 &amp; 创建应用</h2>
+  <div class="step-links"><a href="https://developer.open-douyin.com" target="_blank" rel="noopener noreferrer">抖音开放平台 ↗</a></div>
   <ol>
     <li>打开 <a href="https://developer.open-douyin.com" target="_blank">抖音开放平台</a>，注册 / 登录（个人或企业均可，部分能力要求企业资质）。</li>
     <li>进入「控制台 → 移动应用 / 网站应用」，点「<strong>创建应用</strong>」，填写应用名称、图标、简介。</li>
@@ -79,6 +85,7 @@
   </ol>
 
   <h2 id="scope">三、第 2 步：申请「代替用户发布内容」能力</h2>
+  <div class="step-links"><a href="https://developer.open-douyin.com" target="_blank" rel="noopener noreferrer">抖音开放平台 ↗</a><span>打开后选择自己的应用，再按下方步骤操作。</span></div>
   <ol>
     <li>进入应用的「能力管理」，找到 <strong>「代替用户发布内容到抖音」</strong>，申请开通。</li>
     <li>相关权限：<code>video.create</code>（发布视频）、<code>video.data</code>（查询视频数据，用于轮询最终状态）。</li>
@@ -86,13 +93,15 @@
   </ol>
 
   <h2 id="callback">四、第 3 步：配置回调地址</h2>
+  <div class="step-links"><a href="https://developer.open-douyin.com" target="_blank" rel="noopener noreferrer">抖音开放平台 ↗</a><span>打开后选择自己的应用，再按下方步骤操作。</span></div>
   <p>在应用的「安全设置 / 回调配置」中，填写<strong>授权回调域</strong>：</p>
   <pre><code>http://localhost:5001/platform/douyin_cn/oauth/callback</code></pre>
   <div class="tip">抖音的「授权回调域」通常只校验<strong>域名</strong>（<code>localhost:5001</code>），不校验完整路径，登记域名即可。</div>
 
   <h2 id="fill">五、第 4 步：填进系统「平台配置」页</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <ol>
-    <li>打开系统「平台配置」页：<code>http://localhost:5173/#/platform-config</code>（登录用 <code>admin@qq.com / admin123</code>）。</li>
+    <li>打开系统「平台配置」页：<a href="/#/platform-config" target="_blank" rel="noopener noreferrer">本地平台配置页面 ↗</a>（登录用 <code>admin@qq.com / admin123</code>）。</li>
     <li>找到「<strong>国产抖音</strong>」这一行，点「<strong>配置</strong>」。</li>
     <li>填两项，其它留空：
       <ul>
@@ -104,6 +113,7 @@
   </ol>
 
   <h2 id="auth">六、第 5 步：点「授权」完成授权</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <ol>
     <li>抖音那一行点「<strong>授权</strong>」，跳转到抖音登录 / 授权页。</li>
     <li>用你的抖音账号扫码 / 登录，同意授权。</li>
@@ -111,6 +121,7 @@
   </ol>
 
   <h2 id="success">七、成功标志</h2>
+  <div class="step-links"><a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a> <a href="/#/publish" target="_blank" rel="noopener noreferrer">打开视频发布 ↗</a></div>
   <div class="card">
     <ul style="margin:0">
       <li>页面弹出：<strong>「国产抖音 授权成功，令牌已保存」</strong></li>
@@ -120,6 +131,7 @@
   </div>
 
   <h2 id="errors">八、易错点汇总</h2>
+  <div class="step-links"><a href="https://developer.open-douyin.com" target="_blank" rel="noopener noreferrer">抖音开放平台 ↗</a> <a href="/#/platform-config" target="_blank" rel="noopener noreferrer">打开平台配置 / 账号授权 ↗</a></div>
   <table>
     <tr><th style="width:26%">坑</th><th>现象 / 原因</th><th style="width:42%">解决办法</th></tr>
     <tr><td><strong>走了模拟发布</strong></td><td>配置显示"未配置"，发布是假的</td><td>抖音必须 <code>accessToken</code> + <code>openId</code> 两个都有，缺一个就模拟</td></tr>

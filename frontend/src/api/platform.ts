@@ -50,8 +50,8 @@ export const removePlatformConfig = (id: number) =>
   request({ method: 'DELETE', url: `/platform/${id}` })
 
 // 获取 OAuth 授权跳转地址
-export const getOAuthUrl = (code: string) =>
-  request<{ url: string }>({ method: 'GET', url: `/platform/${code}/oauth/url` })
+export const getOAuthUrl = (code: string, accountId?: string) =>
+  request<{ url: string }>({ method: 'GET', url: `/platform/${code}/oauth/url`, params: { accountId } })
 
 // 刷新访问令牌
 export const refreshOAuthToken = (code: string) =>

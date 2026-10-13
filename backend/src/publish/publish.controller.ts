@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { PublishService } from './publish.service'
-import { CreatePublishTaskDto, BatchCreatePublishTaskDto } from './dto/create-publish-task.dto'
+import { CreatePublishTaskDto, BatchCreatePublishTaskDto, RetryPublishDto } from './dto/create-publish-task.dto'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 
 @ApiTags('视频发布')
@@ -46,8 +46,14 @@ export class PublishController {
 
   @ApiOperation({ summary: '重试发布', description: '重新执行失败/跳过的平台' })
   @Post(':id/retry')
-  retry(@Param('id', ParseIntPipe) id: number) {
-    return this.publishService.retry(id)
+  retry(@Param('id', ParseIntPipe) id: number, @Body() dto: RetryPublishDto) {
+    return this.publishService.retry(id, dto.tiktokPrivacyLevel)
+  }
+
+  @ApiOperation({ summary: '核对已中断任务的 TikTok 平台状态，不重新上传' })
+  @Post(':id/tiktok-status')
+  checkTiktokStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.publishService.checkTiktokStatus(id)
   }
 
   @ApiOperation({ summary: '删除发布任务', description: '删除任务及其平台发布记录' })

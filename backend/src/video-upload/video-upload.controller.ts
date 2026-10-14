@@ -5,7 +5,7 @@ import { diskStorage, memoryStorage } from 'multer'
 import { extname, join } from 'path'
 import { mkdirSync } from 'fs'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
-import { CHUNK_SIZE, MAX_VIDEO_SIZE, randomVideoName, UploadManifest, VideoUploadService } from './video-upload.service'
+import { CHUNK_SIZE, randomVideoName, UploadManifest, VideoUploadService } from './video-upload.service'
 
 const videoDir = join(process.cwd(), 'uploads', 'videos')
 mkdirSync(videoDir, { recursive: true })
@@ -21,7 +21,7 @@ export class VideoUploadController {
   @Post('video')
   @UseInterceptors(FileInterceptor('file', { storage: diskStorage({ destination: videoDir,
     filename: (_req, file, callback) => callback(null, randomVideoName(extname(file.originalname))),
-  }), limits: { fileSize: MAX_VIDEO_SIZE } }))
+  }), limits: { files: 1 } }))
   upload(@UploadedFile() file: Express.Multer.File) {
     if (!file) return { msg: '未接收到文件' }
     return { msg: '上传成功', data: { filename: file.filename, url: `/uploads/videos/${file.filename}`, size: file.size, mimetype: file.mimetype } }

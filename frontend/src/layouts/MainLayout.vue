@@ -72,6 +72,10 @@
             <q-item-section avatar><q-icon name="history" /></q-item-section>
             <q-item-section>发布记录</q-item-section>
           </q-item>
+          <q-item clickable v-ripple to="/folder-publish">
+            <q-item-section avatar><q-icon name="folder_open" /></q-item-section>
+            <q-item-section>文件夹发布</q-item-section>
+          </q-item>
           <q-item clickable v-ripple :to="'/video-library'">
             <q-item-section avatar><q-icon name="video_library" /></q-item-section>
             <q-item-section>视频库</q-item-section>
@@ -80,6 +84,7 @@
             <q-item-section avatar><q-icon name="smart_display" /></q-item-section>
             <q-item-section>油管视频</q-item-section>
           </q-item>
+          <q-item clickable v-ripple to="/ai-models"><q-item-section avatar><q-icon name="auto_awesome" /></q-item-section><q-item-section>AI 模型管理</q-item-section></q-item>
           <q-item clickable v-ripple :to="'/platform-config'">
             <q-item-section avatar><q-icon name="settings" /></q-item-section>
             <q-item-section>平台管理</q-item-section>

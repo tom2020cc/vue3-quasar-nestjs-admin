@@ -64,11 +64,18 @@ describe('resumable local video uploads', () => {
     expect(() => service.status(2, input.uploadId)).toThrow('请先初始化')
     expect(service.initialize(2, input).uploaded).toEqual([])
   })
-  it('validates session fingerprints, limits, names and ids', () => {
-    for (const patch of [{ uploadId: '../bad' }, { fileSize: 0 }, { fileSize: 501 * 1024 * 1024 }, { chunkHashes: [] }, { fileName: '' }]) {
+  it('validates session fingerprints, sizes, names and ids', () => {
+    for (const patch of [{ uploadId: '../bad' }, { fileSize: 0 }, { fileSize: -1 }, { fileSize: NaN }, { fileSize: Infinity }, { chunkHashes: [] }, { fileName: '' }]) {
       expect(() => service.initialize(1, { ...input, ...patch })).toThrow()
     }
     expect(existsSync(join(root, '.upload-sessions'))).toBe(false)
+  })
+  it('initializes a multi-gigabyte upload without a total file-size cap', () => {
+    const fileSize = 3 * 1024 * 1024 * 1024
+    const chunkHashes = Array(Math.ceil(fileSize / CHUNK_SIZE)).fill(hash('chunk'))
+    const manifest = { fileName: 'large.mp4', fileSize, chunkHashes, uploadId: hash(chunkHashes.join('')) }
+    expect(service.initialize(1, manifest).uploaded).toEqual([])
+    expect(service.initialize(1, manifest).uploaded).toEqual([])
   })
   it('can reupload when the completed local file was removed', async () => {
     service.initialize(1, input)

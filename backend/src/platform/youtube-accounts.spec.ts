@@ -167,7 +167,7 @@ describe('YouTube account isolation', () => {
     const { a } = await twoAccounts()
     adapter.buildAuthUrl = ({ state }) => 'https://example.test/?state=' + state
     adapter.exchangeCode = jest.fn().mockResolvedValue({ accessToken: 'access-A', refreshToken: 'new-A' })
-    const oauth = new OAuthService({ get: () => adapter } as any, platforms, { get: () => undefined } as any, accounts, {} as any)
+    const oauth = new OAuthService({ get: () => adapter } as any, platforms, { get: () => undefined } as any, accounts, {} as any, {} as any)
     const { url } = await oauth.buildAuthUrl('youtube', a.id)
     const state = new URL(url).searchParams.get('state')
     await expect(oauth.handleCallback('tiktok', { state, code: 'auth-code' })).rejects.toThrow('不匹配')

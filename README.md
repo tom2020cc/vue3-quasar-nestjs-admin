@@ -245,7 +245,7 @@ VITE v5.x.x  ready in xxx ms
 | GET | `/platform/list` | 平台定义列表（编码/支持尺寸/所需配置字段） | 是 |
 | GET | `/platform` | 平台配置列表（元信息 + 凭证） | 是 |
 | PATCH | `/platform/:id` | 更新平台凭证 / 启用状态 | 是 |
-| POST | `/video-upload/video` | 上传视频（字段 `file`，最大 500MB） | 是 |
+| POST | `/video-upload/video` | 上传视频（字段 `file`，不设文件大小上限） | 是 |
 | POST | `/publish` | 创建发布任务（异步发布到所选平台） | 是 |
 | POST | `/publish/batch` | 批量创建发布任务（逐条隔离失败，返回成功/失败统计） | 是 |
 | GET | `/publish` | 发布任务列表 | 是 |

@@ -62,7 +62,7 @@ describe('YouTube playlists', () => {
   it('refuses membership writes for a foreign playlist or video', async () => {
     api.mockResolvedValueOnce(response({ items: [{ snippet: { channelId: 'channel-b' } }] }))
     await expect(adapter.addVideoToPlaylist(config, 'list', 'video')).rejects.toThrow('不属于')
-    api.mockResolvedValueOnce(response({ items: [{ snippet: { channelId: 'channel-a' } }] }))
+    api.mockResolvedValueOnce(response({ items: [{ id: 'list', snippet: { channelId: 'channel-a' } }] }))
       .mockResolvedValueOnce(response({ items: [{ snippet: { channelId: 'channel-b' } }] }))
     await expect(adapter.addVideoToPlaylist(config, 'list', 'video')).rejects.toThrow('不一致')
     expect(api).toHaveBeenCalledTimes(3)

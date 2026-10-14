@@ -6,7 +6,6 @@ import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 
 export const CHUNK_SIZE = 5 * 1024 * 1024
-export const MAX_VIDEO_SIZE = 500 * 1024 * 1024
 export function guessMime(filename: string): string {
   const map = { '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.m4v': 'video/x-m4v', '.flv': 'video/x-flv' }
   return map[extname(filename).toLowerCase()] || 'video/mp4'
@@ -38,9 +37,9 @@ export class VideoUploadService {
   }
   initialize(owner: number, input: UploadManifest) {
     if (!input || typeof input.fileName !== 'string' || !input.fileName.trim() || input.fileName.length > 255 ||
-        !Number.isSafeInteger(input.fileSize) || input.fileSize <= 0 || input.fileSize > MAX_VIDEO_SIZE ||
+        !Number.isSafeInteger(input.fileSize) || input.fileSize <= 0 ||
         !Array.isArray(input.chunkHashes) || input.chunkHashes.length !== Math.ceil(input.fileSize / CHUNK_SIZE) ||
-        input.chunkHashes.some(h => typeof h !== 'string' || !/^[a-f0-9]{64}$/.test(h))) throw new BadRequestException('文件无效，支持 0–500 MB 的视频')
+        input.chunkHashes.some(h => typeof h !== 'string' || !/^[a-f0-9]{64}$/.test(h))) throw new BadRequestException('文件无效，请选择非空视频并检查分片信息')
     const expectedId = createHash('sha256').update(input.chunkHashes.join('')).digest('hex')
     if (expectedId !== input.uploadId) throw new BadRequestException('文件指纹不匹配')
     const dir = this.directory(owner, input.uploadId)

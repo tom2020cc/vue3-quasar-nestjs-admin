@@ -43,7 +43,7 @@
 
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
-| POST | `/video-upload/video` | 上传视频（表单字段 `file`，最大 500MB），返回 `filename`/`url`/`size` |
+| POST | `/video-upload/video` | 上传视频（表单字段 `file`，不设文件大小上限），返回 `filename`/`url`/`size` |
 | POST | `/publish` | 创建发布任务（携带已上传视频名 + 尺寸 + 目标平台），异步发布 |
 | GET | `/publish` | 发布任务列表 |
 | GET | `/publish/:id` | 任务详情（含各平台发布记录） |

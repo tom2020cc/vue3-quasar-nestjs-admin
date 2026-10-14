@@ -54,7 +54,7 @@
             <template v-slot:body-cell-actions="props">
               <q-td :props="props" class="q-gutter-xs">
                 <q-btn flat dense color="primary" icon="visibility" label="视频详情" @click="openDetail(props.row)" />
-                <q-btn flat dense color="warning" icon="replay" label="重试其他平台" @click="onRetry(props.row)" />
+                <q-btn v-if="['failed', 'partial'].includes(props.row.status)" flat dense color="warning" icon="replay" label="处理未完成项" @click="onRetry(props.row)" />
                 <q-btn flat dense color="negative" icon="delete" label="删除" @click="onDelete(props.row)" />
               </q-td>
             </template>
@@ -91,7 +91,7 @@
               <q-item-section>
                 <q-item-label class="row items-center q-gutter-sm">
                   <span>{{ platformName(r.platform) }}</span>
-                  <q-badge :color="recordColor(r.status)">{{ recordStatusLabel(r.status) }}</q-badge>
+                  <q-badge :color="r.youtubeDeletedAt ? 'grey' : recordColor(r.status)">{{ r.youtubeDeletedAt ? '旧视频已删除（历史记录）' : recordStatusLabel(r.status) }}</q-badge>
                   <q-badge v-if="r.mock" color="grey" outline>模拟</q-badge>
                   <q-badge v-if="r.status === 'processing' && r.pollCount" color="info" outline>轮询 {{ r.pollCount }} 次</q-badge>
                   <q-badge v-if="r.duplicate" color="negative" outline>重复</q-badge>
@@ -104,6 +104,10 @@
                   <div class="text-caption q-mt-xs">仅核对这次上传的结果，不会重新发送视频。</div>
                 </div>
                 <q-item-label v-if="r.platform === 'youtube'" caption>目标频道：{{ r.targetChannelTitle || '旧记录（未绑定频道）' }} {{ r.targetChannelId || '' }}</q-item-label>
+                <div v-if="r.platform === 'youtube' && !r.mock && r.status === 'failed'" class="q-mt-sm">
+                  <q-btn outline dense color="primary" icon="sync" label="核对 YouTube 结果" :loading="checkingStatus" @click="checkYoutubeStatus" />
+                  <div class="text-caption q-mt-xs">先找回原视频，再继续处理所属列表；不会重新上传。</div>
+                </div>
                 <q-item-label v-if="r.youtubePlaylistId" caption>所属列表：{{ r.youtubePlaylistTitle }} · {{ r.youtubePlaylistAdded ? '已加入' : '待加入' }}</q-item-label>
                 <q-item-label v-if="r.externalUrl" caption>
                   <a :href="r.externalUrl" target="_blank">{{ r.externalUrl }}</a>
@@ -119,13 +123,13 @@
     </q-dialog>
 <q-dialog v-model="retryDialog" persistent>
   <q-card style="width: 620px; max-width: 95vw">
-    <q-card-section class="text-h6">重试发布设置</q-card-section>
+    <q-card-section class="text-h6">处理未完成项</q-card-section>
     <q-card-section class="q-gutter-sm">
       <div>视频：{{ retryTask?.title }}</div>
-      <div>只重试其他平台的失败或跳过任务；TikTok API 已停用，已成功的平台不会重复发布。</div>
+      <div>只处理未完成的平台，已成功的平台不再发送。YouTube 已有视频编号时继续核对原视频和所属列表，不重新上传。</div>
     </q-card-section>
     <q-card-actions align="right"><q-btn flat label="取消" :disable="retryBusy" v-close-popup />
-      <q-btn color="primary" label="确认重试发布" :loading="retryBusy" @click="submitRetry" /></q-card-actions>
+      <q-btn color="primary" label="继续处理" :loading="retryBusy" @click="submitRetry" /></q-card-actions>
   </q-card>
 </q-dialog>
 </q-page>
@@ -136,7 +140,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { tiktokPrivacyLabel } from '@/api/tiktok'
 import { Notify, Dialog } from 'quasar'
 import { getPlatformList, type PlatformMeta } from '@/api/platform'
-import { getPublishTasks, getPublishTask, retryPublishTask, removePublishTask, checkTiktokPublishStatus, type PublishTask, type PublishTaskDetail } from '@/api/publish'
+import { getPublishTasks, getPublishTask, retryPublishTask, removePublishTask, checkTiktokPublishStatus, checkYoutubePublishStatus, type PublishTask, type PublishTaskDetail } from '@/api/publish'
 import { API_BASE_URL } from '@/utils/request'
 const platforms = ref<PlatformMeta[]>([])
 onMounted(async () => {
@@ -209,7 +213,7 @@ async function autoRefresh() {
 }
 
 function statusLabel(s: string) {
-  return { publishing: '发布中', success: '全部成功', partial: '部分成功', failed: '全部失败', skipped: '全部跳过' }[s] || s
+  return { publishing: '发布中', success: '全部成功', partial: '部分成功', failed: '需处理', skipped: '全部跳过' }[s] || s
 }
 function statusColor(s: string) {
   return { publishing: 'orange', success: 'positive', partial: 'warning', failed: 'negative', skipped: 'grey' }[s] || 'grey'
@@ -234,6 +238,18 @@ function fullVideoUrl(url: string) {
 const detailDialog = ref(false)
 const detailTask = ref<PublishTaskDetail | null>(null)
 const checkingStatus = ref(false)
+async function checkYoutubeStatus() {
+  if (!detailTask.value || checkingStatus.value) return
+  const id = detailTask.value.id
+  checkingStatus.value = true
+  try {
+    const { data } = await checkYoutubePublishStatus(id)
+    if (detailTask.value?.id === id) detailTask.value = data
+    await loadTasks(true)
+    Notify.create({ type: 'positive', message: '已找回原视频，正在继续核对列表，没有重复上传' })
+  } catch (e: any) { Notify.create({ type: 'negative', message: e.response?.data?.message || '核对失败，请稍后重试' }) }
+  finally { checkingStatus.value = false }
+}
 async function checkTiktokStatus() {
   if (!detailTask.value || checkingStatus.value) return
   const id = detailTask.value.id
@@ -266,6 +282,11 @@ async function onRetry(row: PublishTask) {
     if (data.records.some(r => ['pending', 'publishing', 'processing'].includes(r.status))) throw Error('任务仍在处理中，请等待完成')
     const eligible = data.records.filter(r => r.platform !== 'tiktok' && (r.status === 'failed' || (r.status === 'skipped' && !r.duplicate)))
     if (!eligible.length) throw Error('没有可重试的平台。TikTok 仅支持网页发布，请使用页面上的 TikTok 网页发布入口。')
+    if (eligible.some(r => r.platform === 'youtube' && !r.mock && !r.externalId)) {
+      detailTask.value = data; detailDialog.value = true
+      Notify.create({ type: 'info', message: '先点击“核对 YouTube 结果”，避免上传成功但响应丢失造成重复视频。' })
+      return
+    }
     retryTask.value = data; retryDialog.value = true
   } catch (e: any) { Notify.create({ type: 'negative', message: e.response?.data?.message || e.message || '读取重试设置失败' }) }
 }

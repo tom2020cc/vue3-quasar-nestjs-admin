@@ -1,5 +1,5 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common'
-import { IsIn, IsString, IsUUID, Length } from 'class-validator'
+import { BadRequestException, Body, Controller, Get, Post, Patch, Query, UseGuards } from '@nestjs/common'
+import { IsIn, IsString, IsUUID, Length, Matches } from 'class-validator'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { YoutubeAccountService } from './youtube-account.service'
 import { YoutubeAdapter } from './adapters/youtube.adapter'
@@ -9,6 +9,13 @@ class CreateYoutubePlaylistDto {
   @IsUUID() accountId: string
   @IsString() @Length(1, 150) title: string
   @IsIn(['private', 'unlisted', 'public']) privacyStatus: string
+}
+class UpdateYoutubeDescriptionDto {
+  @IsUUID() accountId: string
+  @IsString() @Matches(/^[a-zA-Z0-9_-]{11}$/) videoId: string
+  @IsString() @Length(1, 100) sourceTitle: string
+  @IsString() @Length(0, 5000) sourceDescription: string
+  @IsString() @Length(1, 5000) description: string
 }
 
 @ApiTags('油管视频')
@@ -45,5 +52,12 @@ export class YoutubeController {
   async listPlaylistVideos(@Query('accountId') accountId: string, @Query('playlistId') playlistId: string) {
     const config = this.accounts.config(await this.accounts.resolve(accountId))
     return { msg: 'ok', data: await this.youtubeAdapter.listPlaylistVideos(config, playlistId) }
+  }
+
+  @Patch('video-description')
+  async updateDescription(@Body() dto: UpdateYoutubeDescriptionDto) {
+    const config = this.accounts.config(await this.accounts.resolve(dto.accountId))
+    try { return { msg: '视频描述已更新', data: await this.youtubeAdapter.updateVideoDescription(config, dto) } }
+    catch (e: any) { throw new BadRequestException(e.message || '视频描述更新失败') }
   }
 }

@@ -95,6 +95,7 @@
       </q-table>
     </q-card>
 
+    <YoutubeQuota :key="`quota-${accountVersion}-${accounts.map(a => a.id + a.enabled).join('-')}`" />
     <YoutubeAccounts :key="`youtube-${accountVersion}`" @changed="accounts = $event" />
     <template v-if="showOtherPlatforms">
       <q-banner class="q-mt-md bg-blue-1 text-primary" rounded>TikTok 授权仅用于读取视频，网页发布需在 TikTok 中手动完成。<template #action><q-btn flat color="primary" label="TikTok 视频" to="/tiktok-videos" /><q-btn flat color="primary" label="TikTok 网页发布" to="/tiktok-browser-publish" /></template></q-banner>
@@ -173,6 +174,7 @@ import PlatformGuideCard from '@/components/PlatformGuideCard.vue'
 import LocalConfigBackup from '@/components/LocalConfigBackup.vue'
 import TiktokAccounts from '@/components/TiktokAccounts.vue'
 import YoutubeAccounts from '@/components/YoutubeAccounts.vue'
+import YoutubeQuota from '@/components/YoutubeQuota.vue'
 import { getYoutubeAccounts, type YoutubeAccount } from '@/api/youtube'
 import { isPublishPlatformReady, isReadyYoutubeAccount } from '@/utils/platformAvailability'
 const accounts = ref<YoutubeAccount[]>([])
@@ -239,7 +241,7 @@ onMounted(() => {
 function handleOAuthCallback() {
   const { oauth, platform, message } = route.query
   if (oauth === 'success') {
-    Notify.create({ type: 'positive', message: platform === 'youtube' ? 'YouTube 频道授权已保存，其他频道授权保持不变' : `「${platformName(String(platform))}」授权成功，令牌已保存` })
+    Notify.create({ type: 'positive', message: platform === 'google-cloud-quota' ? 'Google Cloud 只读授权已保存，正在自动查询配额' : platform === 'youtube' ? 'YouTube 频道授权已保存，其他频道授权保持不变' : `「${platformName(String(platform))}」授权成功，令牌已保存` })
     router.replace({ path: '/platform-config' })
   } else if (oauth === 'error') {
     Notify.create({ type: 'negative', message: `授权失败：${message || ''}` })

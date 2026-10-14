@@ -52,10 +52,26 @@ test('leaving while paused stops the chain before merge or publication', async (
 test('validates file size and uses content fingerprints instead of name collisions', async () => {
   const ids = []
   const u = uploader({ initializeUpload: async data => { ids.push(data.uploadId); return { data: { data: { uploaded: [], result } } } } })
-  await assert.rejects(u.upload(new File([], 'empty.mp4')), /500 MB/)
+  await assert.rejects(u.upload(new File([], 'empty.mp4')), /非空/)
   await u.upload(new File(['aaa'], 'same.mp4', { lastModified: 123 }))
   await u.upload(new File(['bbb'], 'same.mp4', { lastModified: 123 }))
   assert.notEqual(ids[0], ids[1])
   await u.upload(new File(['aaa'], 'renamed.mp4', { lastModified: 456 }))
   assert.equal(ids[0], ids[2])
+})
+test('accepts large-file metadata while reading only bounded slices', async () => {
+  const size = 3 * 1024 * 1024 * 1024
+  let slices = 0
+  const file = { name: 'large.mp4', size, slice(start, end) {
+    assert.ok(end - start <= CHUNK_SIZE)
+    slices++
+    return { arrayBuffer: async () => new ArrayBuffer(1) }
+  } }
+  const u = uploader({ initializeUpload: async data => {
+    assert.equal(data.fileSize, size)
+    assert.equal(data.chunkHashes.length, Math.ceil(size / CHUNK_SIZE))
+    return { data: { data: { uploaded: [], result: { ...result, size } } } }
+  } })
+  assert.equal((await u.upload(file)).size, size)
+  assert.equal(slices, Math.ceil(size / CHUNK_SIZE))
 })

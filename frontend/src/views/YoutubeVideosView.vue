@@ -86,6 +86,10 @@
             <template #prepend><q-icon name="search" /></template>
           </q-input>
         </div>
+        <div class="row items-center q-gutter-sm q-mb-md">
+          <q-btn outline color="primary" icon="auto_awesome" label="AI 批量更新视频描述" :disable="loading || listLoading || !filteredVideos.some(v => !v.unavailable)" @click="openAi(filteredVideos)" />
+          <span class="text-caption text-grey-7">处理当前列表中搜索筛选后的全部视频，先生成预览，再确认同步。</span>
+        </div>
         <q-table class="video-table" :rows="filteredVideos" :columns="videoColumns" :row-key="videoRowKey" :loading="loading || listLoading"
           :pagination="{ rowsPerPage: 10 }" :rows-per-page-options="[10, 20, 50]" flat bordered wrap-cells
           :no-data-label="listLoading ? '正在读取列表中的视频…' : selectedPlaylist ? '此播放列表暂无视频' : loaded ? '该频道暂无视频' : '请选择频道并点击获取 / 刷新'" no-results-label="没有匹配的视频">
@@ -112,12 +116,13 @@
             </q-td>
           </template>
           <template #body-cell-actions="props">
-            <q-td :props="props"><q-btn flat dense color="primary" class="detail-button" icon="visibility" label="视频详情" @click="openDetail(props.row)" /></q-td>
+            <q-td :props="props"><q-btn flat dense color="primary" class="detail-button" icon="visibility" label="视频详情" @click="openDetail(props.row)" /><q-btn flat dense color="primary" icon="auto_awesome" label="AI 更新视频描述" :disable="!!props.row.unavailable" @click="openAi([props.row])" /></q-td>
           </template>
         </q-table>
       </q-card-section>
     </q-card>
 
+    <YoutubeAiDescriptions v-if="aiOpened" :account-id="aiAccount" :channel-label="aiChannelLabel" :videos="aiVideos" @close="aiOpened = false" @updated="descriptionUpdated" />
     <!-- 详情对话框 -->
     <q-dialog v-model="detailDialog">
       <q-card class="video-dialog" style="width: 720px; max-width: 95vw">
@@ -172,11 +177,28 @@
 </template>
 
 <script setup lang="ts">
+import YoutubeAiDescriptions from '@/components/YoutubeAiDescriptions.vue'
+import type { AiText } from '@/api/ai'
 import { ref, computed, onMounted } from 'vue'
 import { Notify } from 'quasar'
 import { getYoutubePlaylists, getYoutubePlaylistVideos, type YoutubePlaylist, getYoutubeVideos, getYoutubeAccounts, youtubeAccountLabel, type YoutubeAccount, type YoutubeVideo } from '@/api/youtube'
 import { formatDuration, formatCount } from '@/utils/format'
 
+const aiOpened = ref(false), aiAccount = ref(''), aiChannelLabel = ref(''), aiVideos = ref<AiText[]>([])
+function openAi(items: YoutubeVideo[]) {
+  if (!accountId.value || loading.value || listLoading.value) return
+  const seen = new Set<string>()
+  aiVideos.value = items.filter(v => !v.unavailable && !seen.has(v.id) && !!seen.add(v.id)).map(v => ({ id: v.id, title: v.title, description: v.description || '' }))
+  if (!aiVideos.value.length) return
+  aiAccount.value = accountId.value
+  aiChannelLabel.value = accountOptions.value.find(a => a.value === accountId.value)?.label || accountId.value
+  aiOpened.value = true
+}
+function descriptionUpdated(id: string, description: string) {
+  if (accountId.value !== aiAccount.value) return
+  for (const v of [...videos.value, ...playlistVideos.value]) if (v.id === id) v.description = description
+  if (detail.value?.id === id) detail.value.description = description
+}
 const search = ref('')
 const videoColumns = [
   { name: 'title', label: '视频标题', field: 'title', align: 'left' as const, sortable: true },

@@ -2,7 +2,7 @@
   <q-page padding class="publish-page">
     <div class="publish-heading row items-center q-mb-lg">
       <div><div class="text-overline text-primary">创作工作台</div><h1>视频发布</h1><div class="text-grey-7">上传素材，选择账号，将内容发布到你的频道。</div></div>
-      <q-space /><q-btn outline color="primary" icon="history" label="发布记录" to="/publish-records" :disable="uploading || batchUploading" />
+      <q-space /><q-btn outline color="primary" icon="folder_open" label="扫描文件夹发布" to="/folder-publish" class="q-mr-sm" :disable="aiBusy || uploading || batchUploading" /><q-btn outline color="primary" icon="history" label="发布记录" to="/publish-records" :disable="aiBusy || uploading || batchUploading" />
     </div>
     <q-banner v-if="submitted" rounded class="bg-green-1 text-positive q-mb-md">已提交发布任务。平台处理状态请前往“发布记录”查看。<template #action><q-btn flat color="positive" label="查看发布记录" to="/publish-records" /></template></q-banner>
     <div class="row q-col-gutter-md">
@@ -19,7 +19,7 @@
             <q-space />
             <q-btn-toggle
               v-model="publishMode"
-              :disable="uploading || batchUploading"
+              :disable="aiBusy || uploading || batchUploading"
               toggle-color="primary"
               unelevated
               no-caps
@@ -42,7 +42,7 @@
               outlined
               dense
               label="选择视频文件"
-              :disable="uploading"
+              :disable="aiBusy || uploading"
               clearable
               @update:model-value="onFileChange"
             >
@@ -58,14 +58,14 @@
                 <q-btn flat dense color="primary" icon="visibility" label="视频详情" class="q-mt-sm" @click="showDraft(videoFile!)" />
               </div>
             </div>
-            <div v-else class="upload-empty"><q-icon name="cloud_upload" size="52px" color="primary" /><div class="text-subtitle1 q-mt-sm">从电脑选择视频</div><div class="text-caption text-grey-7">单个文件最大 500 MB · 自动分片 · 支持断点续传</div></div>
+            <div v-else class="upload-empty"><q-icon name="cloud_upload" size="52px" color="primary" /><div class="text-subtitle1 q-mt-sm">从电脑选择视频</div><div class="text-caption text-grey-7">不设文件大小上限 · 自动分片 · 支持断点续传</div></div>
 
             <!-- 尺寸方向选择 -->
             <div>
               <div class="text-subtitle2 q-mb-sm">尺寸方向</div>
               <q-btn-toggle
                 v-model="orientation"
-                :disable="uploading"
+                :disable="aiBusy || uploading"
                 toggle-color="primary"
                 unelevated
                 no-caps
@@ -78,7 +78,7 @@
             </div>
 
             <!-- 标题 -->
-            <q-input v-model="title" :disable="uploading" outlined dense label="视频标题" :rules="[(v) => !!v || '标题不能为空']" />
+            <q-input v-model="title" :disable="aiBusy || uploading" outlined dense label="视频标题" :rules="[(v) => !!v || '标题不能为空']" />
             </div>
 
             <!-- 批量模式：多选文件 + 逐文件标题/尺寸 + 上传进度 -->
@@ -91,7 +91,7 @@
                 label="选择多个视频（可多选）"
                 multiple
                 clearable
-                :disable="batchUploading"
+                :disable="aiBusy || batchUploading"
                 @update:model-value="onBatchFilesChange"
               >
                 <template v-slot:prepend><q-icon name="movie" /></template>
@@ -110,10 +110,10 @@
                     {{ b.orientation === 'landscape' ? '宽屏' : '窄屏' }}
                   </q-badge>
                   <q-btn flat dense color="primary" label="视频详情" @click="showDraft(b.file)" />
-                  <q-btn flat dense round icon="delete" color="negative" :disable="batchUploading" @click="removeBatchItem(idx)" />
+                  <q-btn flat dense round icon="delete" color="negative" :disable="aiBusy || batchUploading" @click="removeBatchItem(idx)" />
                 </div>
-                <q-input v-model="b.title" :disable="batchUploading" dense outlined label="视频标题" class="q-mt-sm" />
-                <q-input v-model="b.description" :disable="batchUploading" dense outlined type="textarea" autogrow label="视频详情 / 描述（可选）" class="q-mt-sm" />
+                <q-input v-model="b.title" :disable="aiBusy || batchUploading" dense outlined label="视频标题" class="q-mt-sm" />
+                <q-input v-model="b.description" :disable="aiBusy || batchUploading" dense outlined type="textarea" autogrow label="视频详情 / 描述（可选）" class="q-mt-sm" />
                 <div v-if="!b.detecting" class="text-caption text-grey-7 q-mt-xs">
                   {{ b.width }} × {{ b.height }} px · {{ formatDuration(b.duration) }}
                 </div>
@@ -121,7 +121,7 @@
 
             </div>
             <div class="q-mt-lg">
-              <q-btn outline color="primary" icon="cloud_upload" label="仅上传到本地" :loading="uploading || batchUploading" :disable="publishMode === 'single' ? !videoFile : !batchItems.length" @click="uploadOnly" />
+              <q-btn outline color="primary" icon="cloud_upload" label="仅上传到本地" :loading="uploading || batchUploading" :disable="aiBusy || (publishMode === 'single' ? !videoFile : !batchItems.length)" @click="uploadOnly" />
               <p class="text-caption text-grey-7">网络中断后可重试；刷新页面后重新选择同一文件，点击上传即可恢复。</p>
               <UploadProgress :state="uploadState" @pause="pauseUpload" @resume="resumeUpload" @retry="uploadOnly" />
             </div>
@@ -129,7 +129,8 @@
             <section class="settings-section q-gutter-md">
             <div class="text-subtitle1">发布设置</div>
             <!-- 每个视频保存自己的标题与描述 -->
-            <q-input v-if="publishMode === 'single'" v-model="description" :disable="uploading" outlined dense type="textarea" autogrow label="视频详情 / 描述（可选）" />
+            <q-input v-if="publishMode === 'single'" v-model="description" :disable="aiBusy || uploading" outlined dense type="textarea" autogrow label="视频详情 / 描述（可选）" />
+            <AiTextTools :items="aiItems" :disabled="uploading || batchUploading" @busy="aiBusy = $event" @apply="applyAi" />
 
             <!-- 选择平台 -->
             <div>
@@ -192,13 +193,13 @@
             </div>
             <div v-if="selectedPlatforms.includes('youtube')" class="q-gutter-sm">
               <q-select v-model="youtubeAccountId" :options="youtubeOptions" emit-value map-options outlined
-                label="YouTube 目标频道（必选）" :disable="uploading || batchUploading || playlistCreating" />
+                label="YouTube 目标频道（必选）" :disable="aiBusy || uploading || batchUploading || playlistCreating" />
               <YoutubePublishPlaylist v-model="youtubePlaylistId" :account-id="youtubeAccountId"
                 :channel-label="selectedYoutube ? youtubeAccountLabel(selectedYoutube) : ''"
                 :disabled="uploading || batchUploading" @busy="playlistCreating = $event" />
               <div v-if="selectedYoutube" class="text-primary">本次将发布到：{{ youtubeAccountLabel(selectedYoutube) }}。批量发布也使用此频道。</div>
               <div v-else class="text-negative">请先选择频道；没有可选频道时，请到平台配置添加账号或识别原有频道。</div>
-              <q-btn flat dense color="primary" label="管理 YouTube 账号" to="/platform-config" :disable="uploading || batchUploading" />
+              <q-btn flat dense color="primary" label="管理 YouTube 账号" to="/platform-config" :disable="aiBusy || uploading || batchUploading" />
             </div>
 
             </section>
@@ -211,7 +212,7 @@
               icon="send"
               label="上传并发布"
               unelevated
-              :disable="!videoFile || !title || selectedPlatforms.length === 0 || youtubeSelectionMissing || playlistCreating"
+              :disable="aiBusy || !videoFile || !title || selectedPlatforms.length === 0 || youtubeSelectionMissing || playlistCreating"
               :loading="uploading"
               @click="onPublish"
             />
@@ -221,7 +222,7 @@
               icon="send"
               label="批量发布"
               unelevated
-              :disable="batchItems.length === 0 || selectedPlatforms.length === 0 || youtubeSelectionMissing || playlistCreating"
+              :disable="aiBusy || batchItems.length === 0 || selectedPlatforms.length === 0 || youtubeSelectionMissing || playlistCreating"
               :loading="batchUploading"
               @click="onBatchPublish"
             />
@@ -252,6 +253,8 @@
 </template>
 
 <script setup lang="ts">
+import AiTextTools from '@/components/AiTextTools.vue'
+import type { AiResult } from '@/api/ai'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import YoutubePublishPlaylist from '@/components/YoutubePublishPlaylist.vue'
 import { getYoutubeAccounts, youtubeAccountLabel, type YoutubeAccount } from '@/api/youtube'
@@ -304,6 +307,20 @@ const videoHeight = ref(0)
 const videoDuration = ref(0)
 const coverUrl = ref('')
 const orientation = ref<'landscape' | 'portrait'>('landscape')
+const aiBusy = ref(false)
+const aiItems = computed(() => publishMode.value === 'single'
+  ? (videoFile.value ? [{ id: fileId(videoFile.value), title: title.value, description: description.value }] : [])
+  : batchItems.value.map(b => ({ id: fileId(b.file), title: b.title, description: b.description })))
+function applyAi(items: AiResult[]) {
+  for (const r of items) {
+    if (publishMode.value === 'single') {
+      if (videoFile.value && fileId(videoFile.value) === r.id && title.value === r.sourceTitle && description.value === r.sourceDescription) { title.value = r.title; description.value = r.description }
+    } else {
+      const b = batchItems.value.find(b => fileId(b.file) === r.id)
+      if (b && b.title === r.sourceTitle && b.description === r.sourceDescription) { b.title = r.title; b.description = r.description }
+    }
+  }
+}
 const title = ref('')
 const description = ref('')
 const selectedPlatforms = ref<string[]>([])
@@ -312,6 +329,7 @@ const { state: uploadState, upload: uploadWithResume, pause: pauseUpload, resume
 const submitted = ref(false)
 onUnmounted(disposeUpload)
 async function uploadOnly() {
+  if (aiBusy.value) return
   if (uploading.value || batchUploading.value) return
   const files = publishMode.value === 'single' ? (videoFile.value ? [videoFile.value] : []) : batchItems.value.map(b => b.file)
   if (!files.length) return
@@ -544,6 +562,7 @@ function fileId(file: File): string {
 }
 
 async function onPublish() {
+  if (aiBusy.value) return
   if (playlistCreating.value || uploading.value || batchUploading.value) return
   if (!videoFile.value) return
   if (youtubeSelectionMissing.value) { Notify.create({ type: 'warning', message: '请选择 YouTube 目标频道' }); return }
@@ -644,6 +663,7 @@ function removeBatchItem(idx: number) {
 
 // 批量发布：逐文件上传 → 按尺寸过滤兼容平台 → 一次性提交批量任务
 async function onBatchPublish() {
+  if (aiBusy.value) return
   if (playlistCreating.value || uploading.value || batchUploading.value) return
   if (youtubeSelectionMissing.value) { Notify.create({ type: 'warning', message: '请选择 YouTube 目标频道' }); return }
   if (batchItems.value.some(b => !b.title.trim())) { Notify.create({ type: 'warning', message: '请填写每个视频的标题' }); return }

@@ -401,6 +401,54 @@ export class PublishService implements OnApplicationBootstrap {
     record.youtubePlaylistAdded = true
   }
 
+  // Recover a lost upload response without creating another video. The channel API
+  // verifies the bound account; matching must be unique and from this task's time window.
+  async checkYoutubeStatus(id: number) {
+    const task = await this.findOne(id)
+    const record = task.records.find(r => r.platform === 'youtube' && !r.mock)
+    if (!record) throw new BadRequestException('没有可核对的真实 YouTube 发布记录')
+    if (record.status !== 'failed') throw new BadRequestException('仅核对失败或中断的任务；进行中的任务会自动更新')
+    const config = await this.resolveRecordConfig(record)
+    let videoId = record.externalId
+    if (!videoId) {
+      const videos = await (this.factory.get('youtube') as YoutubeAdapter).listChannelVideos(config)
+      const started = new Date(task.createTime).getTime()
+      const matches = videos.filter(v => !v.unavailable && v.title === task.title &&
+        v.description === (task.description || '') && Number.isFinite(started) &&
+        Date.parse(v.publishedAt) >= started - 120000 &&
+        Date.parse(v.publishedAt) <= Date.now() + 120000 &&
+        Number.isFinite(task.duration) && task.duration > 0 && Math.abs(v.duration - task.duration) <= 2)
+      if (matches.length !== 1) throw new BadRequestException(matches.length ? '找到多个可能匹配的视频，请人工核对，未重复上传' : '暂未找到唯一匹配的视频，请稍后再次核对或到频道确认，未重复上传')
+      videoId = matches[0].id
+      const linked = await this.recordRepo.findOne({ where: { platform: 'youtube', targetChannelId: record.targetChannelId, externalId: videoId } })
+      if (linked && linked.id !== record.id) throw new BadRequestException('该视频已绑定其他发布任务，请人工核对')
+    }
+    if (!/^[\w-]{11}$/.test(videoId)) throw new BadRequestException('平台视频编号无效，未更新记录')
+    const changes = await this.recordRepo.update({ id: record.id, status: 'failed' }, {
+      externalId: videoId, externalUrl: `https://youtu.be/${videoId}`, status: 'processing', pollCount: 0,
+      message: '已找到原视频，继续核对转码和所属列表，不重复上传',
+    })
+    if (changes.affected) await this.updateTaskStatus(id)
+    return this.findOne(id)
+  }
+
+  async releaseDeletedYoutube(id: number) {
+    const task = await this.findOne(id)
+    const record = task.records.find(r => r.platform === 'youtube' && !r.mock && !r.duplicate)
+    if (!record || record.status !== 'success' || !record.externalId) {
+      throw new BadRequestException('仅支持核对已成功发布的真实 YouTube 视频')
+    }
+    if (record.youtubeDeletedAt) return task
+    const config = await this.resolveRecordConfig(record)
+    try { await (this.factory.get('youtube') as YoutubeAdapter).assertVideoDeleted(config, record.externalId) }
+    catch (e: any) { throw new BadRequestException(e.message || '核对失败，保留去重保护') }
+    await this.recordRepo.update({ id: record.id, status: 'success', externalId: record.externalId }, {
+      youtubeDeletedAt: new Date(),
+      message: '用户确认已删除；原频道授权查询旧视频已不可用，历史记录保留，允许重新添加此素材',
+    })
+    return this.findOne(id)
+  }
+
   async resolveRecordConfig(record: PublishRecord, publishing = false): Promise<PlatformConfigLike> {
     const platform = await this.configService.findByCode(record.platform)
     if (record.platform === 'tiktok') {
@@ -443,6 +491,7 @@ export class PublishService implements OnApplicationBootstrap {
       .addSelect('task.id', 'taskId')
       .where('record.status = :status', { status: 'success' })
       .andWhere('record.mock = :mock', { mock: false })
+      .andWhere('record.youtubeDeletedAt IS NULL')
       .andWhere('task.videoHash = :hash', { hash: videoHash })
       .getRawMany()
     for (const r of rows) {

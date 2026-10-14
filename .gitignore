@@ -18,6 +18,7 @@ dist-ssr/
 
 # ---- 运行时上传数据 ----
 backend/uploads/
+/static/
 
 # ---- 本地密钥 / 敏感文件（严禁提交）----
 github_token.txt

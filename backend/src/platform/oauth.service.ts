@@ -1,3 +1,5 @@
+import { CLOUD_READ_SCOPES, GoogleQuotaService } from './google-quota.service'
+import { youtubeProjectNumber } from './quota-time'
 import { TiktokAccountService } from './tiktok-account.service'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
@@ -6,6 +8,7 @@ import { PlatformAdapterFactory } from './adapters/platform-adapter.factory'
 import { YoutubeAccountService } from './youtube-account.service'
 import { PlatformConfigLike } from './adapters/platform.interface'
 import {
+  codeChallenge,
   generateCodeVerifier,
   randomState,
 } from './adapters/http.util'
@@ -17,6 +20,7 @@ interface OAuthState {
   codeVerifier?: string
   createdAt: number
   accountId?: string
+  cloudQuota?: boolean
   config: PlatformConfigLike
 }
 
@@ -30,6 +34,7 @@ export class OAuthService {
     private readonly env: ConfigService,
     private readonly youtubeAccounts: YoutubeAccountService,
     private readonly tiktokAccounts: TiktokAccountService,
+    private readonly cloudQuota: GoogleQuotaService,
   ) {}
 
   // 后端对外的基地址（用于生成回调地址，需在各平台控制台登记为「回调域名」）
@@ -48,7 +53,9 @@ export class OAuthService {
   }
 
   // 生成授权跳转地址
-  async buildAuthUrl(code: string, accountId?: string): Promise<{ url: string }> {
+  async buildAuthUrl(code: string, accountId?: string, purpose?: string): Promise<{ url: string }> {
+    const cloudQuota = purpose === 'cloud-quota'
+    if (purpose && (!cloudQuota || code !== 'youtube' || !accountId)) throw new BadRequestException('无效的配额授权请求')
     const adapter = this.factory.get(code)
     if (!adapter) throw new BadRequestException('未知平台')
     if (accountId && !['youtube', 'tiktok'].includes(code)) throw new BadRequestException('该平台不支持多账号')
@@ -62,12 +69,17 @@ export class OAuthService {
 
     const state = randomState()
     let codeVerifier: string | undefined
-    if (adapter.requiresPkce) {
+    if (adapter.requiresPkce || cloudQuota) {
       codeVerifier = generateCodeVerifier()
     }
     for (const [key, value] of this.states) if (Date.now() - value.createdAt > 600000) this.states.delete(key)
-    this.states.set(state, { platform: code, codeVerifier, createdAt: Date.now(), accountId, config: { ...config } })
+    this.states.set(state, { platform: code, codeVerifier, createdAt: Date.now(), accountId, cloudQuota, config: { ...config } })
 
+    if (cloudQuota) {
+      if (!youtubeProjectNumber(config.appId)) throw new BadRequestException('无法识别 Google Cloud 项目')
+      const params = new URLSearchParams({ client_id: config.appId, redirect_uri: this.redirectUri(code), response_type: 'code', scope: CLOUD_READ_SCOPES.join(' '), access_type: 'offline', prompt: 'consent select_account', state, code_challenge: codeChallenge(codeVerifier!), code_challenge_method: 'S256' })
+      return { url: 'https://accounts.google.com/o/oauth2/v2/auth?' + params }
+    }
     const url = adapter.buildAuthUrl({
       state,
       redirectUri: this.redirectUri(code),
@@ -108,6 +120,10 @@ export class OAuthService {
       throw new BadRequestException('请先配置 appId 与 appSecret')
     }
 
+    if (st.cloudQuota) {
+      await this.cloudQuota.authorize({ appId: config.appId, appSecret: config.appSecret }, query.code, this.redirectUri(st.platform), st.codeVerifier!)
+      return 'google-cloud-quota'
+    }
     const result = await adapter.exchangeCode({
       code: query.code,
       redirectUri: this.redirectUri(st.platform),

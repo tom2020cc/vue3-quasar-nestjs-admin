@@ -22,8 +22,8 @@ export class OAuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get(':code/oauth/url')
-  buildUrl(@Param('code') code: string, @Query('accountId') accountId?: string) {
-    return this.oauthService.buildAuthUrl(code, accountId)
+  buildUrl(@Param('code') code: string, @Query('accountId') accountId?: string, @Query('purpose') purpose?: string) {
+    return this.oauthService.buildAuthUrl(code, accountId, purpose)
   }
 
   // 授权回调：由平台方重定向到此处，无需登录态

@@ -1,3 +1,6 @@
+import { GoogleQuotaCredential } from './entities/google-quota-credential.entity'
+import { AiModel } from '../ai/ai-model.entity'
+import { AI_KEYS } from '../ai/ai.validation'
 import { TiktokAccount } from './entities/tiktok-account.entity'
 import { BadRequestException, ConflictException, Injectable, InternalServerErrorException } from '@nestjs/common'
 import { DataSource, EntityManager } from 'typeorm'
@@ -12,6 +15,8 @@ import { BACKEND_KEYS, FRONTEND_KEYS, PLATFORM_KEYS, YOUTUBE_ACCOUNT_KEYS, TIKTO
 
 export const CONFIG_FILENAME = 'local-config.private.json'
 const INSTRUCTIONS = [
+  '版本 5 包含 googleQuotaCredentials：Google Cloud 只读配额授权单独保存，按项目合并；旧备份导入保留这些授权。',
+  '版本 4 包含 aiModels：模型密钥仅保存在本机；按模型 ID 合并，保留所属本地用户 ID，未列出的模型保留。',
   '版本 3 包含 tiktokAccounts 多账号授权，按应用及 open_id 合并；保留已有账号 ID 和未列出的账号。',
   '本文件含真实应用密钥、授权令牌及登录签名密钥，仅在本机保管；已由 .gitignore 排除。不要强制加入 Git 或复制到公开目录。',
   '在「平台配置 → 导入配置」选择本文件。未提供的字段保持不变，null 或空字符串会清空对应平台字段。extra 对象整体替换。',
@@ -45,8 +50,10 @@ export class LocalConfigService {
     const accounts = await manager.getRepository(YoutubeAccount).find({ order: { createTime: 'ASC' } })
     const tiktokAccounts = await manager.getRepository(TiktokAccount).find({ order: { createTime: 'ASC' } })
     return {
-      format: 'video-platform-local-config', version: 3, exportedAt: new Date().toISOString(),
+      format: 'video-platform-local-config', version: 5, exportedAt: new Date().toISOString(),
       instructions: INSTRUCTIONS,
+      googleQuotaCredentials: await manager.getRepository(GoogleQuotaCredential).find(),
+      aiModels: (await manager.getRepository(AiModel).find()).map(a => Object.fromEntries(AI_KEYS.map(k => [k, a[k]]))),
       backendEnv: this.selectEnv('backend', BACKEND_KEYS),
       frontendEnv: this.selectEnv('frontend', FRONTEND_KEYS),
       platforms: configs.map((p) => Object.fromEntries(PLATFORM_KEYS.map((key) => [key, p[key] instanceof Date ? p[key].toISOString() : p[key] ?? null]))),
@@ -69,6 +76,8 @@ export class LocalConfigService {
       return Object.keys(env).filter((key) => current[key] !== env[key])
     }
     return {
+      googleQuotaProjects: (doc.googleQuotaCredentials || []).map(a => a.projectNumber),
+      aiModels: (doc.aiModels || []).map(a => ({ name: a.name, model: a.model, ownerId: a.ownerId })),
       platforms: (doc.platforms || []).map((p) => ({ code: p.code, name: PLATFORMS.find((m) => m.code === p.code)!.name, fields: Object.keys(p).filter((k) => k !== 'code') })),
       tiktokAccounts: (doc.tiktokAccounts || []).map((a) => ({ openId: a.openId, name: a.label || a.displayName || '待识别账号' })),
       youtubeAccounts: (doc.youtubeAccounts || []).map((a) => ({ channelId: a.channelId, name: a.label || a.channelTitle || '待识别频道' })),
@@ -100,7 +109,7 @@ export class LocalConfigService {
       const doc = await this.snapshot()
       validateDocument(doc)
       this.atomicWrite(join(this.root, CONFIG_FILENAME), this.json(doc))
-      return { filename: CONFIG_FILENAME, platformCount: doc.platforms.length, youtubeAccountCount: doc.youtubeAccounts.length, tiktokAccountCount: doc.tiktokAccounts.length, exportedAt: doc.exportedAt }
+      return { aiModelCount: doc.aiModels.length, filename: CONFIG_FILENAME, platformCount: doc.platforms.length, youtubeAccountCount: doc.youtubeAccounts.length, tiktokAccountCount: doc.tiktokAccounts.length, exportedAt: doc.exportedAt }
     } catch (e) {
       if (e instanceof BadRequestException) throw e
       throw new InternalServerErrorException('备份失败，请检查项目目录写入权限')
@@ -119,6 +128,13 @@ export class LocalConfigService {
       const files = [this.envPath('backend'), this.envPath('frontend'), join(this.root, CONFIG_FILENAME)]
       for (const file of files) originals.set(file, existsSync(file) ? readFileSync(file) : null)
       await this.dataSource.transaction(async (manager) => {
+        for (const cred of doc.googleQuotaCredentials || []) await manager.getRepository(GoogleQuotaCredential).save(cred)
+        const models = manager.getRepository(AiModel)
+        for (const patch of doc.aiModels || []) {
+          const current = await models.findOneBy({ id: patch.id })
+          if (current && current.ownerId !== patch.ownerId) throw new BadRequestException('模型 ID 与所属用户冲突')
+          await models.save(models.create(patch))
+        }
         const repo = manager.getRepository(PlatformConfig)
         for (const patch of doc.platforms || []) {
           const meta = PLATFORMS.find((p) => p.code === patch.code)!

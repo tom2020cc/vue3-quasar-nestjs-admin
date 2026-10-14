@@ -5,7 +5,7 @@
       <q-btn outline color="primary" icon="file_upload" label="导入配置" @click="openImport" />
     </div>
     <div class="text-caption text-grey-7 q-mt-sm">
-      本机私密配置文件：local-config.private.json（已排除 Git 提交）。包含平台凭证、所有 YouTube / TikTok 账号授权、服务地址、存储及代理配置。
+      本机私密配置文件：local-config.private.json（已排除 Git 提交）。包含 AI 模型与密钥、平台凭证、所有 YouTube / TikTok 账号授权、服务地址、存储及代理配置。
     </div>
     <q-banner v-if="result" rounded :class="resultError ? 'bg-red-1 text-negative q-mt-sm' : 'bg-green-1 text-green-10 q-mt-sm'" aria-live="polite">{{ result }}</q-banner>
     <q-dialog v-model="opened" :persistent="importing" @hide="clearFile">
@@ -24,6 +24,7 @@
             <div v-for="p in preview.platforms" :key="p.code">{{ p.name }}：{{ p.fields.join('、') }}</div>
             <div v-for="(a, index) in preview.tiktokAccounts" :key="`tiktok-${index}`">TikTok 账号：{{ a.name }}（{{ a.openId || '待识别' }}）</div>
             <div v-for="(a, index) in preview.youtubeAccounts" :key="index">YouTube 频道：{{ a.name }}（{{ a.channelId || '待识别' }}）</div>
+            <div v-for="a in preview.aiModels" :key="a.name + a.model">AI 模型：{{ a.name }}（{{ a.model }}），本地用户 #{{ a.ownerId }}</div>
             <div>后端环境：{{ preview.backendKeys.join('、') || '未提供，保持现状' }}</div>
             <div>前端环境：{{ preview.frontendKeys.join('、') || '未提供，保持现状' }}</div>
             <q-banner class="bg-blue-1 text-blue-10">
@@ -47,6 +48,7 @@ import { ref } from 'vue'
 import request from '@/utils/request'
 
 interface Preview {
+  aiModels: { name: string; model: string; ownerId: number }[]
   platforms: { code: string; name: string; fields: string[] }[]
   backendKeys: string[]
   frontendKeys: string[]
@@ -83,7 +85,7 @@ async function backup() {
   resultError.value = false
   try {
     const { data } = await request.post('/local-config/backup')
-    result.value = `已备份 ${data.platformCount} 个平台、${data.youtubeAccountCount} 个 YouTube 账号、${data.tiktokAccountCount} 个 TikTok 账号及环境配置到项目根目录 ${data.filename}。`
+    result.value = `已备份 ${data.platformCount} 个平台、${data.youtubeAccountCount} 个 YouTube 账号、${data.tiktokAccountCount} 个 TikTok 账号、${data.aiModelCount || 0} 个 AI 模型及环境配置到项目根目录 ${data.filename}。`
   } catch (e) { resultError.value = true; result.value = message(e, '备份失败，请检查后端是否运行') }
   finally { backingUp.value = false }
 }

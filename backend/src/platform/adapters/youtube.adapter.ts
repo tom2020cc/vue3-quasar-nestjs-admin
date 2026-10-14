@@ -54,6 +54,7 @@ function parseIsoDuration(iso: string): number {
 // 文档：https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol
 @Injectable()
 export class YoutubeAdapter implements IPlatformAdapter {
+  private readonly descriptionUpdates = new Set<string>()
   readonly code = PlatformCode.YOUTUBE
   readonly meta = PLATFORMS.find((p) => p.code === this.code)!
   readonly requiresPkce = false // 服务端应用使用 client_secret，无需 PKCE
@@ -92,6 +93,9 @@ export class YoutubeAdapter implements IPlatformAdapter {
     try {
       return await this.realPublish(input, config)
     } catch (e: any) {
+      if (e?.message === 'fetch failed' || ['AbortError', 'TimeoutError'].includes(e?.name)) {
+        return { success: false, message: '上传结果待核对：网络连接中断，请点击“核对 YouTube 结果”，确认原视频后继续，勿重复上传' }
+      }
       return { success: false, message: `油管发布失败：${e.message}` }
     }
   }
@@ -227,12 +231,21 @@ export class YoutubeAdapter implements IPlatformAdapter {
 
   private async ownedPlaylist(token: string, config: PlatformConfigLike, playlistId: string) {
     if (!/^[a-zA-Z0-9_-]{1,150}$/.test(playlistId)) throw new Error('无效的播放列表 ID')
-    const data = await this.youtubeGet(token, 'playlists', { part: 'snippet', id: playlistId })
-    const item = data.items?.[0]
-    if (data.items?.length !== 1 || item.snippet?.channelId !== config.extra?.expectedChannelId) {
+    // Newly created playlists can briefly be absent from reads. Retry only an
+    // explicitly empty successful lookup, never authorization errors or mismatches.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const data = await this.youtubeGet(token, 'playlists', { part: 'snippet', id: playlistId })
+      const item = data.items?.[0]
+      if (data.items?.length === 1 && item.id === playlistId && config.extra?.expectedChannelId && item.snippet?.channelId === config.extra.expectedChannelId) {
+        return { id: item.id, title: item.snippet.title }
+      }
+      if (Array.isArray(data.items) && data.items.length === 0 && attempt < 2) {
+        await sleep(1000 * (attempt + 1))
+        continue
+      }
       throw new Error('播放列表不属于所选频道或已不可用，请刷新列表')
     }
-    return { id: item.id, title: item.snippet.title }
+    throw new Error('播放列表暂未就绪，请稍后刷新')
   }
 
   async validatePublishPlaylist(config: PlatformConfigLike, playlistId: string) {
@@ -279,6 +292,44 @@ export class YoutubeAdapter implements IPlatformAdapter {
     })
   }
 
+  async updateVideoDescription(config: PlatformConfigLike, input: { videoId: string; sourceTitle: string; sourceDescription: string; description: string }) {
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(input.videoId) || typeof input.description !== 'string' || !input.description.trim() || Buffer.byteLength(input.description, 'utf8') > 5000 || /[<>]/.test(input.description)) throw new Error('视频 ID 或描述无效；描述须为非空、最多 5000 字节且不含尖括号')
+    const lock = `${config.extra?.expectedChannelId}:${input.videoId}`
+    if (this.descriptionUpdates.has(lock)) throw new Error('此视频正在更新，请稍后核对结果')
+    this.descriptionUpdates.add(lock)
+    try {
+      const token = await this.refreshAccessToken(config, true)
+      await this.assertTarget(token, config)
+      const data = await this.youtubeGet(token, 'videos', { part: 'snippet', id: input.videoId })
+      const video = data.items?.[0], snippet = video?.snippet
+      if (data.items?.length !== 1 || snippet?.channelId !== config.extra.expectedChannelId) throw new Error('视频不属于所选频道或已不可用，未更新')
+      // An earlier request may have succeeded with a lost response. Never write it twice.
+      if (snippet.description === input.description) return { id: input.videoId, description: input.description, unchanged: true }
+      if (snippet.title !== input.sourceTitle || (snippet.description || '') !== input.sourceDescription) throw new Error('视频标题或描述已变化，请刷新并重新生成，避免覆盖其他修改')
+      if (!snippet.categoryId) throw new Error('无法读取视频分类，未更新')
+      // Updating the snippet replaces its writable fields. Preserve title, category, tags and language.
+      const preserved: Record<string, any> = { title: snippet.title, categoryId: snippet.categoryId, description: input.description }
+      for (const key of ['tags', 'defaultLanguage']) if (snippet[key] !== undefined) preserved[key] = snippet[key]
+      let response: Response
+      try {
+        response = await fetch('https://www.googleapis.com/youtube/v3/videos?part=snippet', {
+          method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(video.etag ? { 'If-Match': video.etag } : {}) },
+          body: JSON.stringify({ id: input.videoId, snippet: preserved }), signal: AbortSignal.timeout(30000),
+        })
+      } catch { throw new Error('更新结果待核对：网络中断，请刷新视频列表确认后再操作') }
+      if (!response.ok) {
+        await response.body?.cancel()
+        if (response.status === 412) throw new Error('视频已被其他操作修改，请刷新后重新生成')
+        if (response.status === 403) throw new Error('YouTube 拒绝更新，请检查频道管理权限或 API 配额；旧授权可能需要重新授权')
+        throw new Error(`YouTube 更新未确认（HTTP ${response.status}），请刷新核对后再操作`)
+      }
+      let updated: any
+      try { updated = await response.json() } catch { throw new Error('更新结果待核对：无法读取响应，请刷新确认') }
+      if (updated.id !== input.videoId || updated.snippet?.description !== input.description) throw new Error('更新结果待核对：平台返回内容不一致，请刷新确认')
+      return { id: updated.id, description: updated.snippet.description, unchanged: false }
+    } finally { this.descriptionUpdates.delete(lock) }
+  }
+
   private async youtubeGet(accessToken: string, resource: string, params: Record<string, string>) {
     const response = await fetch(`https://www.googleapis.com/youtube/v3/${resource}?${new URLSearchParams(params)}`, {
       headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(30000),
@@ -286,6 +337,17 @@ export class YoutubeAdapter implements IPlatformAdapter {
     const data: any = await response.json()
     if (!response.ok) throw new Error(`获取 YouTube 数据失败：${data?.error?.message || response.status}`)
     return data
+  }
+
+  // Only the owning channel's authenticated, successful lookup can release a
+  // previously published file. An HTTP/auth/quota failure must never mean deleted.
+  async assertVideoDeleted(config: PlatformConfigLike, videoId: string): Promise<void> {
+    if (!/^[\w-]{11}$/.test(videoId)) throw new Error('旧视频编号无效，无法解除去重保护')
+    const token = await this.refreshAccessToken(config)
+    await this.assertTarget(token, config)
+    const data = await this.youtubeGet(token, 'videos', { part: 'id', id: videoId })
+    if (!Array.isArray(data.items)) throw new Error('YouTube 返回结果异常，保留去重保护')
+    if (data.items.length) throw new Error('旧视频仍存在，保留去重保护，不会重新上传')
   }
 
   async listChannelPlaylists(config: PlatformConfigLike, summaryOnly = false): Promise<YoutubePlaylist[]> {

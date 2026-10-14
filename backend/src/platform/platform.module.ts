@@ -1,3 +1,8 @@
+import { GoogleQuotaCredential } from './entities/google-quota-credential.entity'
+import { GoogleQuotaService } from './google-quota.service'
+import { YoutubeQuotaSnapshot } from './entities/youtube-quota.entity'
+import { YoutubeQuotaService } from './youtube-quota.service'
+import { YoutubeQuotaController } from './youtube-quota.controller'
 import { TiktokAccount } from './entities/tiktok-account.entity'
 import { TiktokAccountService } from './tiktok-account.service'
 import { TiktokAccountController } from './tiktok-account.controller'
@@ -25,9 +30,11 @@ import { YoutubeAccountService } from './youtube-account.service'
 import { YoutubeAccountController } from './youtube-account.controller'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PlatformConfig, YoutubeAccount, TiktokAccount]), StorageModule],
-  controllers: [PlatformConfigController, OAuthController, YoutubeController, TiktokController, LocalConfigController, YoutubeAccountController, TiktokAccountController],
+  imports: [TypeOrmModule.forFeature([PlatformConfig, YoutubeAccount, TiktokAccount, YoutubeQuotaSnapshot, GoogleQuotaCredential]), StorageModule],
+  controllers: [YoutubeQuotaController, PlatformConfigController, OAuthController, YoutubeController, TiktokController, LocalConfigController, YoutubeAccountController, TiktokAccountController],
   providers: [
+    GoogleQuotaService,
+    YoutubeQuotaService,
     YoutubeAccountService,
     TiktokAccountService,
     LocalConfigService,

@@ -56,3 +56,20 @@ export const createYoutubePlaylist = (data: { accountId: string; title: string; 
   request<{ msg: string; data: Pick<YoutubePlaylist, 'id' | 'title' | 'privacyStatus'> }>({ method: 'POST', url: '/youtube/playlists', data, timeout: 60000 })
 export const getYoutubePlaylistVideos = (accountId: string, playlistId: string) =>
   request<{ msg: string; data: YoutubeVideo[] }>({ method: 'GET', url: '/youtube/playlist-videos', params: { accountId, playlistId }, timeout: 120000 })
+
+export const updateYoutubeDescription = (data: { accountId: string; videoId: string; sourceTitle: string; sourceDescription: string; description: string }) =>
+  request<{ data: { id: string; description: string; unchanged: boolean } }>({ method: 'PATCH', url: '/youtube/video-description', data, timeout: 120000 })
+
+export interface YoutubeQuotaGroup {
+  key: string
+  projectNumber: string | null
+  consoleUrl: string
+  cloud: { connected: boolean; status: string; checkedAt?: string; quotaDay?: string; message: string; metrics: { metric: string; name: string; dailyLimit: number | null; used: number | null; remaining: number | null; observedAt: string | null; delayed: boolean; stale: boolean }[] }
+  snapshot: { dailyLimit: number; used: number; remaining: number; observedAt: string; quotaDay: string; expired: boolean; source: 'manual_console' } | null
+  channels: { id: string; title: string; channelId: string | null; enabled: boolean }[]
+}
+export interface YoutubeQuotaOverview { serverTime: string; nextResetAt: string; groups: YoutubeQuotaGroup[] }
+export const getYoutubeQuota = () => request<YoutubeQuotaOverview>({ method: 'GET', url: '/youtube/quota', timeout: 120000 })
+export const saveYoutubeQuota = (projectNumber: string, data: { dailyLimit: number; used: number; observedAt: string }) => request<YoutubeQuotaOverview>({ method: 'PUT', url: `/youtube/quota/${projectNumber}`, data })
+
+export const connectYoutubeQuota = (accountId: string) => request<{ url: string }>({ method: 'GET', url: '/platform/youtube/oauth/url', params: { accountId, purpose: 'cloud-quota' } })

@@ -1,3 +1,5 @@
+import { GoogleQuotaCredential } from './entities/google-quota-credential.entity'
+import { AiModel } from '../ai/ai-model.entity'
 import { TiktokAccount } from './entities/tiktok-account.entity'
 import 'reflect-metadata'
 import { DataSource } from 'typeorm'
@@ -23,7 +25,7 @@ describe('Local configuration import and backup', () => {
     mkdirSync(join(root, 'frontend'))
     writeFileSync(join(root, 'backend/.env'), 'JWT_SECRET=original-test-secret\nBACKEND_PORT=5001\nCUSTOM_SETTING=keep-me\n')
     writeFileSync(join(root, 'frontend/.env'), 'VITE_API_BASE_URL=http://localhost:5001\n')
-    source = new DataSource({ type: 'better-sqlite3', database: join(root, 'backend/test.sqlite'), entities: [PlatformConfig, YoutubeAccount, TiktokAccount], synchronize: true })
+    source = new DataSource({ type: 'better-sqlite3', database: join(root, 'backend/test.sqlite'), entities: [PlatformConfig, YoutubeAccount, TiktokAccount, AiModel, GoogleQuotaCredential], synchronize: true })
     await source.initialize()
     await source.getRepository(PlatformConfig).save({ code: 'youtube', name: 'YouTube', enabled: true, appSecret: 'old-secret', refreshToken: 'keep-token', tokenExpiresAt: new Date('2026-10-07T10:00:00.000Z'), extra: { channel: 'test' } })
     service = new LocalConfigService(source)
@@ -47,6 +49,33 @@ describe('Local configuration import and backup', () => {
     expect(JSON.stringify([saved, preview, imported])).not.toContain('keep-token')
     expect(JSON.stringify([saved, preview, imported])).not.toContain('original-test-secret')
     expect(await source.getRepository(PlatformConfig).count()).toBe(1)
+  })
+  it('round-trips AI model keys privately and preserves models on legacy imports', async () => {
+    const model = { id: '11111111-1111-4111-8111-111111111111', ownerId: 1, name: 'DeepSeek', provider: 'deepseek', baseUrl: 'https://api.deepseek.com', model: 'test', apiKey: 'fake-ai-secret', enabled: true }
+    await source.getRepository(AiModel).save(model)
+    await service.saveBackup()
+    const full = JSON.parse(readFileSync(join(root, CONFIG_FILENAME), 'utf8'))
+    expect(full.version).toBe(5)
+    expect(full.aiModels[0].apiKey).toBe('fake-ai-secret')
+    expect(JSON.stringify(service.preview(full))).not.toContain('fake-ai-secret')
+    await source.getRepository(AiModel).update(model.id, { apiKey: 'changed' })
+    await service.importConfig(full)
+    expect((await source.getRepository(AiModel).findOneBy({ id: model.id })).apiKey).toBe('fake-ai-secret')
+    await service.importConfig(doc({ platforms: [{ code: 'youtube', name: 'YouTube' }] }))
+    expect(await source.getRepository(AiModel).count()).toBe(1)
+    await expect(service.importConfig(doc({ version: 4, aiModels: [{ ...model, ownerId: 2 }] }))).rejects.toThrow('所属用户冲突')
+    expect(() => service.preview(doc({ version: 4, aiModels: [{ ...model, baseUrl: 'http://external.test' }] }))).toThrow()
+  })
+  it('backs up Cloud quota authorization without exposing it and preserves it on old imports', async () => {
+    const cred = { projectNumber: '123', appId: '123-app.apps.googleusercontent.com', appSecret: 'cloud-secret', refreshToken: 'cloud-refresh' }
+    await source.getRepository(GoogleQuotaCredential).save(cred)
+    const full = await service.snapshot()
+    expect(validateDocument(full).googleQuotaCredentials).toEqual([cred])
+    expect(JSON.stringify(service.preview(full))).not.toMatch(/cloud-secret|cloud-refresh/)
+    await source.getRepository(GoogleQuotaCredential).update('123', { refreshToken: 'changed' })
+    await service.importConfig(full)
+    await service.importConfig(doc({ platforms: [{ code: 'youtube', name: 'YouTube' }] }))
+    expect((await source.getRepository(GoogleQuotaCredential).findOneBy({ projectNumber: '123' })).refreshToken).toBe('cloud-refresh')
   })
   it('merges provided fields, preserves omitted fields, clears explicit nulls, and saves recovery', async () => {
     const result = await service.importConfig(doc({ platforms: [{ code: 'youtube', appSecret: 'new-secret', extra: null }] }))
@@ -107,7 +136,7 @@ describe('Local configuration import and backup', () => {
     await repo.save(repo.create([first, second]))
     await service.saveBackup()
     const full = JSON.parse(readFileSync(join(root, CONFIG_FILENAME), 'utf8'))
-    expect(full.version).toBe(3)
+    expect(full.version).toBe(5)
     expect(full.youtubeAccounts).toHaveLength(2)
     expect(JSON.stringify(service.preview(full))).not.toContain('test-refresh')
     await service.importConfig(full)
@@ -137,7 +166,7 @@ describe('Local configuration import and backup', () => {
     const a = await repo.save(repo.create({ id: '11111111-1111-4111-8111-111111111111', openId: 'open-A', displayName: 'A',
       label: '', enabled: true, appId: 'app', appSecret: 'secret', accessToken: 'token-A', refreshToken: 'refresh-A', tokenExpiresAt: null }))
     const snapshot = await service.snapshot()
-    expect(snapshot.version).toBe(3)
+    expect(snapshot.version).toBe(5)
     expect(snapshot.tiktokAccounts).toHaveLength(1)
     await service.importConfig(doc({ version: 3, tiktokAccounts: [{ ...snapshot.tiktokAccounts[0],
       id: '22222222-2222-4222-8222-222222222222', label: 'renamed' }] }))

@@ -1,3 +1,4 @@
+import { AI_KEYS, validateModel } from '../ai/ai.validation'
 import { BadRequestException } from '@nestjs/common'
 import { PLATFORMS } from './adapters/platform.interface'
 
@@ -18,7 +19,9 @@ export const YOUTUBE_ACCOUNT_KEYS = ['id', 'channelId', 'channelTitle', 'label',
 export const TIKTOK_ACCOUNT_KEYS = ['id', 'openId', 'displayName', 'label', 'enabled', 'appId', 'appSecret', 'accessToken', 'refreshToken', 'tokenExpiresAt']
 export interface LocalConfigDocument {
   format: 'video-platform-local-config'
-  version: 1 | 2 | 3
+  version: 1 | 2 | 3 | 4 | 5
+  aiModels?: Record<string, any>[]
+  googleQuotaCredentials?: Record<string, any>[]
   exportedAt?: string
   instructions?: string[]
   backendEnv?: Record<string, string>
@@ -75,8 +78,8 @@ export function validateDocument(input: unknown): LocalConfigDocument {
   if (!object(input)) invalid('请选择 JSON 配置文件')
   if (Buffer.byteLength(JSON.stringify(input), 'utf8') > MAX_CONFIG_BYTES) invalid('配置文件不能超过 1 MB')
   safeTree(input)
-  if (input.format !== 'video-platform-local-config' || ![1, 2, 3].includes(input.version)) invalid('不支持的配置格式或版本')
-  const topKeys = ['format', 'version', 'exportedAt', 'instructions', 'backendEnv', 'frontendEnv', 'platforms', 'youtubeAccounts', 'tiktokAccounts']
+  if (input.format !== 'video-platform-local-config' || ![1, 2, 3, 4, 5].includes(input.version)) invalid('不支持的配置格式或版本')
+  const topKeys = ['format', 'version', 'exportedAt', 'instructions', 'backendEnv', 'frontendEnv', 'platforms', 'youtubeAccounts', 'tiktokAccounts', 'aiModels', 'googleQuotaCredentials']
   if (Object.keys(input).some((k) => !topKeys.includes(k))) invalid('配置包含未知字段')
   if (input.exportedAt !== undefined && (typeof input.exportedAt !== 'string' || !Number.isFinite(Date.parse(input.exportedAt)))) invalid('导出时间无效')
   if (input.instructions !== undefined && (!Array.isArray(input.instructions) || input.instructions.some((v: any) => typeof v !== 'string'))) invalid('配置说明格式无效')
@@ -119,7 +122,7 @@ export function validateDocument(input: unknown): LocalConfigDocument {
     }
   }
   if (input.tiktokAccounts !== undefined) {
-    if (input.version !== 3 || !Array.isArray(input.tiktokAccounts)) invalid('多账号配置需要使用版本 3')
+    if (input.version < 3 || !Array.isArray(input.tiktokAccounts)) invalid('多账号配置需要使用版本 3')
     const ids = new Set<string>(), channels = new Set<string>()
     for (const a of input.tiktokAccounts) {
       if (!object(a) || Object.keys(a).some((k) => !TIKTOK_ACCOUNT_KEYS.includes(k)) || TIKTOK_ACCOUNT_KEYS.some((k) => !(k in a))) invalid('TikTok 账号字段缺失或未知')
@@ -136,6 +139,26 @@ export function validateDocument(input: unknown): LocalConfigDocument {
       if (a.tokenExpiresAt !== null && (typeof a.tokenExpiresAt !== 'string' || !Number.isFinite(Date.parse(a.tokenExpiresAt)))) invalid('TikTok 令牌到期时间无效')
     }
   }
-  if (!input.platforms?.length && !input.youtubeAccounts?.length && !input.tiktokAccounts?.length && !Object.keys(input.backendEnv || {}).length && !Object.keys(input.frontendEnv || {}).length) invalid('配置文件没有可导入的配置')
+  if (input.googleQuotaCredentials !== undefined) {
+    if (input.version < 5 || !Array.isArray(input.googleQuotaCredentials)) invalid('Cloud 配额授权需要版本 5')
+    const seen = new Set<string>()
+    for (const a of input.googleQuotaCredentials) {
+      if (!object(a) || Object.keys(a).some(k => !['projectNumber', 'appId', 'appSecret', 'refreshToken'].includes(k))) invalid('Cloud 配额配置格式无效')
+      if (typeof a.projectNumber !== 'string' || !/^\d+$/.test(a.projectNumber) || seen.has(a.projectNumber)) invalid('Cloud 项目编号无效或重复')
+      for (const k of ['appId', 'appSecret', 'refreshToken']) if (typeof a[k] !== 'string' || !a[k] || a[k].length > 65536) invalid('Cloud 配额凭证不完整')
+      if (!a.appId.startsWith(a.projectNumber + '-') || !a.appId.endsWith('.apps.googleusercontent.com')) invalid('Cloud 配额应用与项目不匹配')
+      seen.add(a.projectNumber)
+    }
+  }
+  if (input.aiModels !== undefined) {
+    if (input.version < 4 || !Array.isArray(input.aiModels)) invalid('AI 模型配置需要版本 4')
+    const ids = new Set<string>()
+    for (const model of input.aiModels) {
+      validateModel(model)
+      if (AI_KEYS.some(k => !(k in model)) || typeof model.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(model.id) || ids.has(model.id) || !Number.isSafeInteger(model.ownerId) || model.ownerId < 1) invalid('AI 模型 ID 或所属用户无效')
+      ids.add(model.id)
+    }
+  }
+  if (!input.googleQuotaCredentials?.length && !input.aiModels?.length && !input.platforms?.length && !input.youtubeAccounts?.length && !input.tiktokAccounts?.length && !Object.keys(input.backendEnv || {}).length && !Object.keys(input.frontendEnv || {}).length) invalid('配置文件没有可导入的配置')
   return input as LocalConfigDocument
 }

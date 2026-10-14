@@ -30,6 +30,7 @@ export interface PublishTask {
 
 // 平台发布记录
 export interface PublishRecord {
+  youtubeDeletedAt?: string | null
   id: number
   taskId: number
   platform: string
@@ -131,6 +132,12 @@ export const retryPublishTask = (id: number, tiktokPrivacyLevel?: string) =>
 // 核对已中断的 TikTok 上传，不重新发布
 export const checkTiktokPublishStatus = (id: number) =>
   request<PublishTaskDetail>({ method: 'POST', url: `/publish/${id}/tiktok-status`, timeout: 60000 })
+
+export const checkYoutubePublishStatus = (id: number) =>
+  request<PublishTaskDetail>({ method: 'POST', url: `/publish/${id}/youtube-status`, timeout: 120000 })
+
+export const releaseDeletedYoutube = (id: number) =>
+  request<PublishTaskDetail>({ method: 'POST', url: `/publish/${id}/youtube-deleted`, timeout: 120000 })
 
 // 删除发布任务
 export const removePublishTask = (id: number) =>

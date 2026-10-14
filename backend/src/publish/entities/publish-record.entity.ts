@@ -9,6 +9,7 @@ import {
 // 平台发布记录表：一条任务对应多个平台，每个平台一条记录
 @Entity()
 export class PublishRecord {
+  @Column({ type: 'datetime', nullable: true }) youtubeDeletedAt: Date | null
   @Column({ type: 'text', nullable: true }) tiktokPrivacyLevel: string | null
   @Column({ type: 'text', nullable: true }) youtubePlaylistId: string | null
   @Column({ type: 'text', nullable: true }) youtubePlaylistTitle: string | null

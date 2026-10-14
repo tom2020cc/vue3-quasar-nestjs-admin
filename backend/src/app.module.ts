@@ -1,3 +1,4 @@
+import { AiModule } from './ai/ai.module';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -22,6 +23,7 @@ import { BrowserPublishModule } from './browser-publish/browser-publish.module';
       entities: [__dirname + '/**/*.entity{.ts,.js}'],  // 自动加载实体
       synchronize: process.env.DB_SYNCHRONIZE !== 'false', // 由环境变量控制，生产环境置 false 避免自动改表丢数据
     }),
+    AiModule,
     UserModule,
     AuthModule,
     MenuModule,

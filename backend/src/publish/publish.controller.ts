@@ -56,6 +56,17 @@ export class PublishController {
     return this.publishService.checkTiktokStatus(id)
   }
 
+  @ApiOperation({ summary: '核对 YouTube 原视频，恢复转码及列表处理，不重新上传' })
+  @Post(':id/youtube-status')
+  checkYoutubeStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.publishService.checkYoutubeStatus(id)
+  }
+
+  @Post(':id/youtube-deleted')
+  releaseDeletedYoutube(@Param('id', ParseIntPipe) id: number) {
+    return this.publishService.releaseDeletedYoutube(id)
+  }
+
   @ApiOperation({ summary: '删除发布任务', description: '删除任务及其平台发布记录' })
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {

@@ -50,7 +50,7 @@ const error = ref('')
 const dialog = ref(false)
 const creating = ref(false)
 const title = ref('')
-const privacy = ref('private')
+const privacy = ref('public')
 const createError = ref('')
 const privacyOptions = [{ label: '私密', value: 'private' }, { label: '不公开（知道链接的人可查看）', value: 'unlisted' }, { label: '公开', value: 'public' }]
 let loadVersion = 0
@@ -77,7 +77,7 @@ watch(() => props.accountId, () => {
 }, { immediate: true })
 function openCreate() {
   title.value = ''
-  privacy.value = 'private'
+  privacy.value = 'public'
   createError.value = ''
   dialog.value = true
 }

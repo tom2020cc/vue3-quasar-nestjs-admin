@@ -52,7 +52,7 @@ export function useResumableUpload() {
     check()
     Object.assign(state, { name: file.name, stage: 'hashing', percent: 0, bytes: 0, total: file.size, speed: 0, resumed: 0, message: '', index, count })
     try {
-      if (file.size <= 0 || file.size > 500 * 1024 * 1024) throw new Error('请选择 0–500 MB 的视频文件')
+      if (file.size <= 0) throw new Error('请选择非空视频文件')
       let input = fingerprints.get(file)
       if (!input) {
         const chunkHashes: string[] = []
